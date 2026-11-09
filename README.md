@@ -97,7 +97,7 @@
 
 ### 方式一：安装包（推荐）
 
-到 [Releases](https://github.com/YOUR_GITHUB_NAME/pdf-reader/releases) 下载 `PDFReader-Setup-x.y.z.exe`，
+到 [Releases](https://github.com/pinzhuo0905-rgb/pdf-reader/releases) 下载 `PDFReader-Setup-x.y.z.exe`，
 双击安装（「仅为我安装」不需要管理员权限）。
 
 安装包未做代码签名，首次运行 Windows SmartScreen 可能提示「未知发布者」→ 更多信息 → 仍要运行。
@@ -108,7 +108,7 @@
 ### 方式二：从源码运行
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_NAME/pdf-reader.git
+git clone https://github.com/pinzhuo0905-rgb/pdf-reader.git
 cd pdf-reader
 npm install      # 自动执行 scripts/prepare-vendor.mjs
 npm start        # 开发模式

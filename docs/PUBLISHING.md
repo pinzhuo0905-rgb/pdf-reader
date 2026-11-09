@@ -6,12 +6,12 @@
 
 ## 0. 上线前先替换占位符
 
-仓库里所有 `YOUR_GITHUB_NAME` 都要换成你的 GitHub 用户名（或组织名）：
+仓库里所有 `pinzhuo0905-rgb` 都要换成你的 GitHub 用户名（或组织名）：
 
 ```bash
 # 在项目根目录执行（Git Bash / macOS / Linux）
-grep -rl "YOUR_GITHUB_NAME" . --exclude-dir=node_modules --exclude-dir=dist \
-  | xargs sed -i 's/YOUR_GITHUB_NAME/你的用户名/g'
+grep -rl "pinzhuo0905-rgb" . --exclude-dir=node_modules --exclude-dir=dist \
+  | xargs sed -i 's/pinzhuo0905-rgb/你的用户名/g'
 ```
 
 涉及文件：`README.md`、`CONTRIBUTING.md`、`package.json`、`docs/release-notes-v1.0.0.md`、
@@ -122,7 +122,7 @@ gh repo create pdf-reader --public --source=. --remote=origin --push \
 2. 然后：
 
 ```bash
-git remote add origin https://github.com/YOUR_GITHUB_NAME/pdf-reader.git
+git remote add origin https://github.com/pinzhuo0905-rgb/pdf-reader.git
 git push -u origin main
 ```
 

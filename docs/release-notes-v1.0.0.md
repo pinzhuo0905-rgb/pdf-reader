@@ -46,7 +46,7 @@ Get-FileHash .\PDFReader-Setup-1.0.0.exe -Algorithm SHA256
 ## 从源码构建
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_NAME/pdf-reader.git
+git clone https://github.com/pinzhuo0905-rgb/pdf-reader.git
 cd pdf-reader
 npm install
 npm run dist
@@ -54,7 +54,7 @@ npm run dist
 
 ## 反馈
 
-- 发现 Bug → [新建 Issue](https://github.com/YOUR_GITHUB_NAME/pdf-reader/issues/new?template=bug_report.md)
-- 想要功能 → [功能建议](https://github.com/YOUR_GITHUB_NAME/pdf-reader/issues/new?template=feature_request.md)
+- 发现 Bug → [新建 Issue](https://github.com/pinzhuo0905-rgb/pdf-reader/issues/new?template=bug_report.md)
+- 想要功能 → [功能建议](https://github.com/pinzhuo0905-rgb/pdf-reader/issues/new?template=feature_request.md)
 
 **完整变更**：这是首个公开版本，没有历史对比。

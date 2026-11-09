@@ -5,13 +5,13 @@
   "main": "src/main/main.js",
   "author": "PDF Reader contributors",
   "license": "MIT",
-  "homepage": "https://github.com/YOUR_GITHUB_NAME/pdf-reader#readme",
+  "homepage": "https://github.com/pinzhuo0905-rgb/pdf-reader#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR_GITHUB_NAME/pdf-reader.git"
+    "url": "https://github.com/pinzhuo0905-rgb/pdf-reader.git"
   },
   "bugs": {
-    "url": "https://github.com/YOUR_GITHUB_NAME/pdf-reader/issues"
+    "url": "https://github.com/pinzhuo0905-rgb/pdf-reader/issues"
   },
   "keywords": [
     "pdf",

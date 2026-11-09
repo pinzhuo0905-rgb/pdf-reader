@@ -11,7 +11,7 @@
 | Windows | 10 / 11 x64 | 当前只提供 Windows 安装包；核心代码是跨平台的 |
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_NAME/pdf-reader.git
+git clone https://github.com/pinzhuo0905-rgb/pdf-reader.git
 cd pdf-reader
 npm install          # 会自动执行 postinstall → scripts/prepare-vendor.mjs
 npm start            # 开发模式启动
