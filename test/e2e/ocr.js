@@ -21,6 +21,7 @@
 
     // 框选区域识别
     const page = st.pages[0];
+    const pageLines = st.ocr ? st.ocr.boxes.length : 0;
     const rect = page.el.getBoundingClientRect();
     App.ocr.startRegionSelect();
     await sleep(100);
@@ -35,9 +36,10 @@
     window.dispatchEvent(pe('pointermove', x1, y1));
     await sleep(60);
     window.dispatchEvent(pe('pointerup', x1, y1));
+    // 等区域识别覆盖掉上一次的整页结果
     for (let i = 0; i < 100; i++) {
       await sleep(150);
-      if (st.ocr && st.ocr.boxes.length) break;
+      if (st.ocr && st.ocr.boxes.length !== pageLines) break;
     }
     out.regionLines = st.ocr ? st.ocr.boxes.length : 0;
     out.allInsideRegion = st.ocr

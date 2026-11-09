@@ -65,11 +65,13 @@
     await sleep(200);
     log.text = App.annots.get(page.id).filter((a) => a.type === 'text').length;
 
-    // 5) 橡皮擦（点在画笔线上）
+    // 5) 橡皮擦（点在画笔线的中间节点上）
     App.ui.setTool('eraser');
     await sleep(150);
+    const inkAnnot = App.annots.get(page.id).find((a) => a.type === 'ink');
+    const mid = inkAnnot.points[Math.floor(inkAnnot.points.length / 2)];
     const r2 = page.el.getBoundingClientRect();
-    ev('pointerdown', r2.left + r2.width * 0.3, r2.top + r2.height * 0.4435);
+    ev('pointerdown', r2.left + r2.width * mid.x, r2.top + r2.height * mid.y);
     await sleep(200);
     log.inkAfterErase = App.annots.get(page.id).filter((a) => a.type === 'ink').length;
 
