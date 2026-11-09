@@ -63,6 +63,24 @@ dbnet  crnn-ctc
 
 ---
 
+## 1.5 懒人模式：一条命令完成 1~5 步
+
+如果不想逐条敲，仓库里带了脚本（Windows PowerShell 5.1 即可运行）：
+
+```powershell
+# 在 PowerShell 里执行；若被执行策略拦截，先跑：
+# Set-ExecutionPolicy -Scope Process Bypass -Force
+
+# 预演：只替换占位符，不联网不推送
+.\scripts\publish.ps1 -User 你的用户名 -DryRun
+
+# 正式发布：建仓 → 设 Topics → 推送 → 打 tag → 发 Release → 上传安装包
+.\scripts\publish.ps1 -User 你的用户名 -Token ghp_xxxxxxxx
+```
+
+令牌在 https://github.com/settings/tokens 生成（只勾 `repo`），**用完立刻撤销**。
+脚本跑完会把 remote 里的 token 换回干净地址。
+
 ## 2. 首次提交（本地）
 
 ```bash
