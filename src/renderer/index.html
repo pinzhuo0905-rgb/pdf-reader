@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' app:; script-src 'self' app:; style-src 'self' app: 'unsafe-inline'; img-src 'self' app: data: blob:; font-src 'self' app: data:; worker-src 'self' app: blob:; connect-src 'self' app: data: blob:;"
+    />
+    <title>PDF 阅读器</title>
+    <link rel="stylesheet" href="css/app.css" />
+  </head>
+  <body>
+    <div id="app" class="theme-light">
+      <!-- ============================== 工具栏 ============================== -->
+      <header id="toolbar" class="toolbar">
+        <div class="tb-left">
+          <button class="icon-btn" id="btn-menu" data-icon="menu" title="菜单"></button>
+          <span class="sep"></span>
+          <button class="icon-btn" id="btn-undo" data-icon="undo" title="撤销 (Ctrl+Z)" disabled></button>
+          <button class="icon-btn" id="btn-redo" data-icon="redo" title="重做 (Ctrl+Y)" disabled></button>
+
+          <div class="tb-group" id="grp-highlight">
+            <button class="icon-btn" id="btn-highlight" title="高亮 (H)">
+              <span class="ico" data-icon="highlight"></span>
+              <i class="swatch" id="hl-swatch"></i>
+            </button>
+            <button class="caret" id="btn-hl-caret" title="高亮选项" data-icon="chevronDown"></button>
+          </div>
+
+          <div class="tb-group labeled" id="grp-draw">
+            <button class="labeled-btn" id="btn-draw" title="绘制 (D)">
+              <span class="ico" data-icon="draw"></span><span class="lbl">绘制</span>
+            </button>
+            <button class="caret" id="btn-draw-caret" title="绘制选项" data-icon="chevronDown"></button>
+          </div>
+
+          <button class="icon-btn" id="btn-eraser" data-icon="eraser" title="橡皮擦 (E)"></button>
+
+          <span class="sep"></span>
+          <button class="icon-btn" id="btn-textbox" data-icon="textBox" title="添加文本 (T)"></button>
+          <span class="sep"></span>
+          <button class="icon-btn" id="btn-read" data-icon="readAloud" title="朗读"></button>
+          <button class="icon-btn" id="btn-ocr" data-icon="ocr" title="文字识别 (OCR)"></button>
+          <span class="sep"></span>
+          <button class="icon-btn" id="btn-more" data-icon="more" title="更多工具"></button>
+        </div>
+
+        <div class="tb-center">
+          <button class="icon-btn sm" id="btn-zoom-out" data-icon="minus" title="缩小 (Ctrl+-)"></button>
+          <button class="icon-btn sm" id="btn-zoom-in" data-icon="plus" title="放大 (Ctrl++)"></button>
+          <button class="icon-btn" id="btn-fit-width" data-icon="fitWidth" title="适应宽度"></button>
+          <span class="sep"></span>
+          <div class="page-box">
+            <input id="page-input" class="page-input" value="1" inputmode="numeric" aria-label="页码" />
+            <span class="of" id="page-total">/ 0</span>
+          </div>
+          <span class="sep"></span>
+          <button class="icon-btn" id="btn-rotate" data-icon="rotate" title="旋转页面 (R)"></button>
+          <span class="sep"></span>
+          <button class="icon-btn" id="btn-viewmode" data-icon="twoPage" title="双页视图"></button>
+        </div>
+
+        <div class="tb-right">
+          <button class="icon-btn" id="btn-search" data-icon="search" title="搜索 (Ctrl+F)"></button>
+          <span class="sep"></span>
+          <button class="icon-btn" id="btn-print" data-icon="print" title="打印 (Ctrl+P)"></button>
+          <button class="icon-btn" id="btn-save" data-icon="save" title="保存 (Ctrl+S)"></button>
+          <button class="icon-btn" id="btn-saveas" data-icon="saveAs" title="另存为 (Ctrl+Shift+S)"></button>
+          <span class="sep"></span>
+          <button class="icon-btn" id="btn-fullscreen" data-icon="expand" title="全屏 (F11)"></button>
+          <button class="icon-btn" id="btn-settings" data-icon="settings" title="设置"></button>
+          <span class="sep"></span>
+          <button class="text-btn" id="btn-editpdf" title="编辑 PDF 内容">编辑 PDF</button>
+        </div>
+      </header>
+
+      <!-- ========================= 编辑工具二级栏 ========================= -->
+      <div id="editbar" class="editbar hidden">
+        <span class="eb-title" id="eb-title">编辑</span>
+        <span class="sep"></span>
+        <button class="eb-btn" id="eb-select" data-icon="cursor">选择</button>
+        <button class="eb-btn" id="eb-textedit" data-icon="editText">编辑文字</button>
+        <button class="eb-btn" id="eb-textbox" data-icon="textBox">添加文本</button>
+        <button class="eb-btn" id="eb-image" data-icon="image">插入图片</button>
+        <button class="eb-btn" id="eb-shape" data-icon="shapes">形状</button>
+        <button class="eb-btn" id="eb-whiteout" data-icon="whiteout">涂改</button>
+        <span class="sep"></span>
+        <button class="eb-btn" id="eb-rotate">旋转页面</button>
+        <button class="eb-btn" id="eb-deletepage">删除页面</button>
+        <button class="eb-btn" id="eb-insertpage">插入空白页</button>
+        <span class="sep"></span>
+        <div class="eb-prop" id="eb-props"></div>
+        <span class="flex"></span>
+        <button class="eb-btn primary" id="eb-done">完成</button>
+      </div>
+
+      <!-- ============================== 主区域 ============================== -->
+      <main id="main" class="main">
+        <aside id="sidebar" class="sidebar hidden">
+          <div class="sidebar-head">
+            <span>页面缩略图</span>
+            <button class="icon-btn sm" id="sidebar-close" data-icon="close" title="关闭"></button>
+          </div>
+          <div class="thumbs" id="thumbs"></div>
+        </aside>
+
+        <div id="scrollArea" class="scroll-area">
+          <div id="pages" class="pages"></div>
+        </div>
+
+        <!-- 搜索浮层 -->
+        <div id="searchbar" class="searchbar hidden">
+          <span class="s-ico" data-icon="search"></span>
+          <input id="search-input" placeholder="在文档中搜索" spellcheck="false" />
+          <span class="s-count" id="search-count">0/0</span>
+          <button class="icon-btn sm" id="search-prev" data-icon="chevronUp" title="上一个"></button>
+          <button class="icon-btn sm" id="search-next" data-icon="chevronDown" title="下一个"></button>
+          <button class="icon-btn sm" id="search-close" data-icon="close" title="关闭"></button>
+        </div>
+
+        <!-- OCR 文字识别面板 -->
+        <aside id="ocrPanel" class="ocr-panel hidden">
+          <div class="op-head">
+            <span class="op-title"><span data-icon="ocr"></span>文字识别</span>
+            <button class="icon-btn sm" id="ocr-close" data-icon="close" title="关闭"></button>
+          </div>
+          <div class="op-tools">
+            <button class="op-btn primary" id="ocr-run-page">识别当前页</button>
+            <button class="op-btn" id="ocr-run-region">框选区域</button>
+          </div>
+          <div class="op-lang">
+            <span>识别语言</span>
+            <select id="ocr-lang" class="op-select">
+              <option value="auto">自动（中英混排）</option>
+              <option value="ch">中文 + 英文</option>
+              <option value="en">纯英文</option>
+            </select>
+          </div>
+          <div class="op-status" id="ocr-status">把扫描页或图片中的文字识别为可复制的文本</div>
+          <div class="op-list" id="ocr-list"></div>
+          <div class="op-foot">
+            <button class="op-btn" id="ocr-copy-all">复制全部</button>
+            <button class="op-btn" id="ocr-insert">插入文本框</button>
+            <label class="op-check"><input type="checkbox" id="ocr-show-boxes" checked /> 显示识别框</label>
+          </div>
+        </aside>
+
+        <!-- 空状态 -->
+        <div id="empty" class="empty">
+          <div class="empty-inner">
+            <img class="empty-icon" src="assets/pdf-icon-256.png" alt="PDF" />
+            <h1>打开 PDF 文件</h1>
+            <p>将文件拖放到此处，或点击下方按钮选择文件</p>
+            <button class="btn-primary" id="empty-open">打开文件</button>
+          </div>
+        </div>
+
+        <!-- 加载中 -->
+        <div id="loading" class="loading hidden">
+          <div class="spinner"></div>
+          <span id="loading-text">正在打开…</span>
+        </div>
+
+        <!-- 悬浮页码（滚动时显示） -->
+        <div id="float-page" class="float-page hidden"></div>
+      </main>
+
+      <!-- 下拉菜单容器 -->
+      <div id="menuLayer" class="menu-layer hidden"></div>
+
+      <!-- 上下文菜单 -->
+      <div id="ctxMenu" class="ctx-menu hidden"></div>
+
+      <!-- 提示 -->
+      <div id="toast" class="toast hidden"></div>
+
+      <!-- 弹窗 -->
+      <div id="modal" class="modal hidden">
+        <div class="modal-card">
+          <div class="modal-head">
+            <span id="modal-title">提示</span>
+            <button class="icon-btn sm" id="modal-close" data-icon="close"></button>
+          </div>
+          <div class="modal-body" id="modal-body"></div>
+          <div class="modal-foot" id="modal-foot"></div>
+        </div>
+      </div>
+
+      <!-- 文字编辑浮层 -->
+      <div id="textEditor" class="text-editor hidden">
+        <textarea id="textEditorInput" spellcheck="false"></textarea>
+        <div class="te-actions">
+          <button id="te-cancel" class="btn-ghost">取消</button>
+          <button id="te-ok" class="btn-primary">确定</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="vendor/pdf.min.js"></script>
+    <script src="vendor/fontkit.umd.min.js"></script>
+    <script src="vendor/pdf-lib.min.js"></script>
+    <script src="js/icons.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/viewer.js"></script>
+    <script src="js/annotate.js"></script>
+    <script src="js/textedit.js"></script>
+    <script src="js/exporter.js"></script>
+    <script src="js/ocr.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
