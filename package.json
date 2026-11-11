@@ -1,6 +1,6 @@
 {
   "name": "pdf-reader",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "界面纯净、功能丰富的 PDF 阅读器：复刻 Edge 阅读器观感，内置标注、内容编辑与中英双语离线 OCR",
   "main": "src/main/main.js",
   "author": "PDF Reader contributors",
@@ -42,7 +42,8 @@
     "icon:edge": "node scripts/extract-edge-icon.mjs",
     "shots": "node scripts/make-screenshots.mjs",
     "test:interact": "node scripts/run-e2e.mjs test/e2e/interact.js --delay 9000",
-    "test:ocr": "node scripts/run-e2e.mjs test/e2e/ocr.js --delay 16000"
+    "test:ocr": "node scripts/run-e2e.mjs test/e2e/ocr.js --delay 16000",
+    "test:tabs": "node scripts/run-e2e.mjs test/e2e/tabs.js --delay 14000"
   },
   "devDependencies": {
     "@pdf-lib/fontkit": "^1.1.1",

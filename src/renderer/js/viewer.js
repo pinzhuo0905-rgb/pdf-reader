@@ -5,43 +5,147 @@
 
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
 
+  /**
+   * el 是「当前标签页的视图引用」。
+   * 切换标签页时只把 el 上的属性指向该标签页自己的 DOM，
+   * 这样所有 el.scroll / el.pages 的用法都不需要改。
+   */
   const el = {};
   const cache = {
     textContent: new Map(), // pageId -> {items, styles}
-    pageObj: new Map(), // src index -> pdfjs page
+    pageObj: new WeakMap(), // pdfDoc -> Map(src index -> pdfjs page)
   };
+  /** 滚动时额外要通知的钩子（文字编辑浮层用来取消编辑） */
+  const scrollHooks = [];
 
   const PAD_X = 24;
 
   /* ------------------------------- 初始化 ------------------------------- */
   function init() {
-    el.scroll = document.getElementById('scrollArea');
-    el.pages = document.getElementById('pages');
+    el.views = document.getElementById('views');
     el.main = document.getElementById('main');
     el.pageInput = document.getElementById('page-input');
     el.pageTotal = document.getElementById('page-total');
     el.floatPage = document.getElementById('float-page');
     el.thumbs = document.getElementById('thumbs');
+    el.outline = document.getElementById('outline');
     el.sidebar = document.getElementById('sidebar');
     el.loading = document.getElementById('loading');
     el.empty = document.getElementById('empty');
 
-    el.scroll.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onResize);
-    setupObserver();
+    startRepairTimer();
+  }
+
+  /** 兜底巡检：可见页如果没画出来（异常中断），自动补一次 */
+  function startRepairTimer() {
+    setInterval(() => {
+      const st = S();
+      if (!st.pdfDoc || !el.scroll || st.pages.length > 300) return;
+      for (const p of st.pages) {
+        if (!p.el || p.rendered) continue;
+        const r = p.el.getBoundingClientRect();
+        const area = el.scroll.getBoundingClientRect();
+        const visible = r.bottom > area.top && r.top < area.bottom;
+        if (!visible) continue;
+        if (p.rendering) {
+          // 渲染任务异常卡住时（极少见）兜底复位，避免一直白页
+          if (!p._renderStart) p._renderStart = Date.now();
+          else if (Date.now() - p._renderStart > 5000) {
+            p.rendering = false;
+            p._renderStart = 0;
+            renderPage(p.id);
+          }
+          continue;
+        }
+        renderPage(p.id);
+      }
+    }, 1500);
+  }
+
+  /* ---------------------------- 每标签页的视图 ---------------------------- */
+
+  /** 为一个标签页创建独立的滚动区与页面容器 */
+  function createView(tab) {
+    const view = document.createElement('div');
+    view.className = 'view';
+    view.dataset.tab = tab.id;
+
+    const scroll = document.createElement('div');
+    scroll.className = 'scroll-area';
+    const pages = document.createElement('div');
+    pages.className = 'pages';
+
+    scroll.appendChild(pages);
+    view.appendChild(scroll);
+    el.views.appendChild(view);
+
+    tab.dom = { view, scroll, pages };
+
+    scroll.addEventListener('scroll', onScroll, { passive: true });
+    // 每个视图一个观察器，root 必须是它自己的滚动容器
+    tab.observer = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) renderPage(e.target.dataset.id);
+        }
+      },
+      { root: scroll, rootMargin: '600px 0px' }
+    );
+
+    return tab.dom;
+  }
+
+  /** 把 viewer 的 el 指向某个标签页（切换标签页时调用） */
+  function bindTab(tab) {
+    if (!tab || !tab.dom) return;
+    el.view = tab.dom.view;
+    el.scroll = tab.dom.scroll;
+    el.pages = tab.dom.pages;
+  }
+
+  function destroyView(tab) {
+    if (tab.observer) {
+      tab.observer.disconnect();
+      tab.observer = null;
+    }
+    if (tab.dom && tab.dom.view) tab.dom.view.remove();
+    tab.dom = null;
+  }
+
+  /** 注册「滚动时」回调（例如关闭文字编辑浮层） */
+  function onScrollHook(fn) {
+    scrollHooks.push(fn);
   }
 
   /* -------------------------------- 加载 -------------------------------- */
-  async function load(bytes, filePath, fileName) {
+  let loadingCount = 0;
+
+  function isLoading() {
+    return loadingCount > 0;
+  }
+
+  /** 加载期间禁止切换标签页，避免 DOM 与状态错位 */
+  async function load(bytes, filePath, fileName, opts = {}) {
+    loadingCount++;
+    try {
+      return await doLoad(bytes, filePath, fileName, opts);
+    } finally {
+      loadingCount--;
+      if (loadingCount === 0 && App.tabs) App.tabs.flushPending();
+    }
+  }
+
+  async function doLoad(bytes, filePath, fileName, opts = {}) {
     showLoading('正在打开…');
     const state = S();
     state.bytes = bytes;
     state.filePath = filePath;
     state.fileName = fileName || (filePath ? filePath.split(/[\\/]/).pop() : '未命名.pdf');
     cache.textContent.clear();
-    cache.pageObj.clear();
     state.annots = new Map();
     state.ocr = null;
+    state.outline = null;
     state.search = { query: '', matches: [], index: -1 };
 
     try {
@@ -89,9 +193,11 @@
     updatePageIndicator();
     App.ui.setTitle();
     App.ui.setDocState(true);
+    buildOutline();
     requestAnimationFrame(() => {
       layout();
-      scrollToPage(0, false);
+      const target = opts.page ? Math.max(0, Math.min(state.pages.length - 1, opts.page - 1)) : 0;
+      scrollToPage(target, false);
     });
     return true;
   }
@@ -114,10 +220,17 @@
     };
   }
 
-  async function getPage(srcIndex) {
-    if (cache.pageObj.has(srcIndex)) return cache.pageObj.get(srcIndex);
-    const page = await S().pdfDoc.getPage(srcIndex + 1);
-    cache.pageObj.set(srcIndex, page);
+  async function getPage(srcIndex, doc) {
+    const pdfDoc = doc || S().pdfDoc;
+    if (!pdfDoc) return null;
+    let map = cache.pageObj.get(pdfDoc);
+    if (!map) {
+      map = new Map();
+      cache.pageObj.set(pdfDoc, map);
+    }
+    if (map.has(srcIndex)) return map.get(srcIndex);
+    const page = await pdfDoc.getPage(srcIndex + 1);
+    map.set(srcIndex, page);
     return page;
   }
 
@@ -205,14 +318,22 @@
 
   function layout() {
     const z = S().zoom;
+    let resized = false;
     for (const p of S().pages) {
       if (!p.el) continue;
+      const prev = p._layoutZoom || 0;
+      const changed = !prev || Math.abs(prev - z) / z > 0.03;
       p.el.style.width = p.wPt * z + 'px';
       p.el.style.height = p.hPt * z + 'px';
-      sizeOverlay(p);
-      p.rendered = false; // 尺寸变化后需重绘
+      if (changed) {
+        // 只有尺寸真的变了才清空重绘；切换标签页时保留已有画布，避免闪白
+        p._layoutZoom = z;
+        sizeOverlay(p);
+        p.rendered = false;
+        resized = true;
+      }
     }
-    renderVisible(true);
+    renderVisible(resized);
   }
 
   function sizeOverlay(p) {
@@ -224,18 +345,6 @@
   }
 
   /* ------------------------------ 懒渲染 ------------------------------ */
-  let observer = null;
-  function setupObserver() {
-    observer = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) renderPage(e.target.dataset.id);
-        }
-      },
-      { root: el.scroll, rootMargin: '600px 0px' }
-    );
-  }
-
   function renderVisible(force) {
     const area = el.scroll.getBoundingClientRect();
     const margin = 700;
@@ -261,40 +370,56 @@
   }
 
   async function renderPage(pageId) {
-    const p = S().pages.find((x) => x.id === pageId);
-    if (!p || p.rendering || p.src == null) return;
-    if (p.rendered && p._lastZoom === S().zoom) return;
+    const st = S();
+    const p = st.pages.find((x) => x.id === pageId);
+    if (!p || p.src == null) return;
+    if (p.rendering) {
+      // 正在绘制：记一个待办，等这次结束后再补一次，避免并发绘制同一画布
+      p._queued = true;
+      return;
+    }
+    if (p.rendered && p._lastZoom === st.zoom) return;
     p.rendering = true;
-    p._lastZoom = S().zoom;
+    p._renderStart = Date.now();
+    p._lastZoom = st.zoom;
+    const zoom = st.zoom;
     const dpr = window.devicePixelRatio || 1;
     try {
-      const page = await getPage(p.src);
-      const viewport = page.getViewport({ scale: S().zoom * dpr, rotation: p.rot });
+      const page = await getPage(p.src, st.pdfDoc);
+      if (!page) return;
+      // 渲染期间切换了标签页：放弃本次绘制，等激活时重来
+      if (S() !== st) return;
+      const viewport = page.getViewport({ scale: zoom * dpr, rotation: p.rot });
       const canvas = p.canvas;
       canvas.width = Math.round(viewport.width);
       canvas.height = Math.round(viewport.height);
-      canvas.style.width = p.wPt * S().zoom + 'px';
-      canvas.style.height = p.hPt * S().zoom + 'px';
+      canvas.style.width = p.wPt * zoom + 'px';
+      canvas.style.height = p.hPt * zoom + 'px';
       const ctx = canvas.getContext('2d', { alpha: false });
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       const task = page.render({ canvasContext: ctx, viewport });
       await task.promise;
+      if (S() !== st) return;
       p.rendered = true;
-      p.el.classList.remove('loading');
-      await buildTextLayer(p, page);
+      await buildTextLayer(p, page, zoom);
       drawOverlay(p);
       renderThumbIfOpen(p);
     } catch (err) {
       if (err && err.name !== 'RenderingCancelledException') console.warn('render fail', err);
     } finally {
       p.rendering = false;
+      p._renderStart = 0;
+      if (p._queued) {
+        p._queued = false;
+        renderPage(pageId);
+      }
     }
   }
 
   /* ------------------------------- 文本层 ------------------------------- */
-  async function buildTextLayer(p, page) {
-    const viewport = page.getViewport({ scale: S().zoom, rotation: p.rot });
+  async function buildTextLayer(p, page, zoom) {
+    const viewport = page.getViewport({ scale: zoom || S().zoom, rotation: p.rot });
     let tc = cache.textContent.get(p.id);
     if (!tc) {
       const content = await page.getTextContent();
@@ -424,6 +549,13 @@
     if (scrollRaf) return;
     scrollRaf = requestAnimationFrame(() => {
       scrollRaf = 0;
+      for (const fn of scrollHooks) {
+        try {
+          fn();
+        } catch (e) {
+          /* 钩子异常不影响滚动 */
+        }
+      }
       updatePageIndicator();
       renderVisible(false);
       showFloatPage();
@@ -484,8 +616,28 @@
     el.scroll.scrollTop = p.el.offsetTop - 8 + anchor.ratio * p.el.offsetHeight;
   }
 
+  /**
+   * 切回某个标签页时调用：不重算缩放（避免 1% 的抖动导致整页重绘），
+   * 只有当窗口宽度明显变化过才重新适应宽度。
+   */
+  function resumeView() {
+    const st = S();
+    if (!el.scroll) return;
+    const w = el.scroll.clientWidth;
+    const stale = st._viewWidth && Math.abs(st._viewWidth - w) > 24;
+    if (stale && (st.zoomMode === 'auto' || st.zoomMode === 'fitWidth' || st.zoomMode === 'fitPage')) {
+      computeAutoZoom();
+      layout();
+    } else {
+      renderVisible(false);
+    }
+    st._viewWidth = w;
+    updatePageIndicator();
+  }
+
   function onResize() {
-    if (!S().pdfDoc) return;
+    S()._viewWidth = el && el.scroll ? el.scroll.clientWidth : 0;
+    if (!el.scroll || !S().pdfDoc) return;
     if (S().zoomMode === 'fitWidth' || S().zoomMode === 'fitPage' || S().zoomMode === 'auto') {
       const a = captureAnchor();
       computeAutoZoom();
@@ -602,22 +754,73 @@
     buildThumbs();
   }
 
+  /* ------------------------------- 目录：书签 ------------------------------- */
+  async function buildOutline() {
+    const box = el.outline;
+    if (!box) return;
+    const st = S();
+    box.innerHTML = '';
+    let items = null;
+    try {
+      items = st.pdfDoc ? await st.pdfDoc.getOutline() : null;
+    } catch {
+      items = null;
+    }
+    st.outline = items && items.length ? items : null;
+    if (!st.outline) {
+      box.classList.add('hidden');
+      return;
+    }
+    box.classList.remove('hidden');
+    const render = (list, level) => {
+      for (const it of list) {
+        const row = document.createElement('div');
+        row.className = 'ol-item';
+        row.style.paddingLeft = 12 + level * 12 + 'px';
+        row.textContent = it.title;
+        row.title = it.title;
+        row.onclick = () => gotoOutline(it);
+        box.appendChild(row);
+        if (it.items && it.items.length) render(it.items, level + 1);
+      }
+    };
+    render(st.outline, 0);
+  }
+
+  async function gotoOutline(item) {
+    const st = S();
+    try {
+      let dest = item.dest;
+      if (typeof dest === 'string') dest = await st.pdfDoc.getDestination(dest);
+      if (!Array.isArray(dest) || !dest.length) return;
+      const idx = await st.pdfDoc.getPageIndex(dest[0]);
+      scrollToPage(idx);
+    } catch (e) {
+      /* 目标无效时忽略 */
+    }
+  }
+
   /* ------------------------------- 缩略图 ------------------------------- */
   function buildThumbs() {
     if (el.sidebar.classList.contains('hidden')) return;
     el.thumbs.innerHTML = '';
-    const dpr = window.devicePixelRatio || 1;
     S().pages.forEach((p, i) => {
       const wrap = document.createElement('div');
       wrap.className = 'thumb';
       wrap.dataset.index = i;
       wrap.dataset.id = p.id;
+
+      const box = document.createElement('div');
+      box.className = 'thumb-box';
       const c = document.createElement('canvas');
-      wrap.appendChild(c);
+      box.appendChild(c);
+      wrap.appendChild(box);
+
       const num = document.createElement('span');
       num.className = 'num';
       num.textContent = i + 1;
       wrap.appendChild(num);
+
       el.thumbs.appendChild(wrap);
       wrap.addEventListener('click', () => scrollToPage(i));
       renderThumb(p, c);
@@ -626,8 +829,7 @@
   }
 
   async function renderThumb(p, canvas) {
-    const dpr = window.devicePixelRatio || 1;
-    const targetW = 160;
+    const targetW = 168;
     const scale = targetW / p.wPt;
     try {
       if (p.src == null) {
@@ -638,7 +840,8 @@
         c.fillRect(0, 0, canvas.width, canvas.height);
         return;
       }
-      const page = await getPage(p.src);
+      const page = await getPage(p.src, S().pdfDoc);
+      if (!page) return;
       const vp = page.getViewport({ scale, rotation: p.rot });
       canvas.width = Math.round(vp.width);
       canvas.height = Math.round(vp.height);
@@ -660,19 +863,33 @@
   }
 
   function highlightThumb(index) {
+    let active = null;
     el.thumbs.querySelectorAll('.thumb').forEach((t) => {
-      t.classList.toggle('current', Number(t.dataset.index) === index);
+      const on = Number(t.dataset.index) === index;
+      t.classList.toggle('current', on);
+      if (on) active = t;
     });
+    if (active && el.thumbs.scrollHeight > el.thumbs.clientHeight) {
+      const top = active.offsetTop - el.thumbs.clientHeight / 2 + active.offsetHeight / 2;
+      el.thumbs.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    }
   }
 
   function toggleSidebar(show) {
     const visible = show === undefined ? el.sidebar.classList.contains('hidden') : show;
     el.sidebar.classList.toggle('hidden', !visible);
-    if (visible) buildThumbs();
+    if (visible) {
+      buildThumbs();
+      buildOutline();
+    }
     requestAnimationFrame(() => {
       if (S().pdfDoc) onResize();
     });
     return visible;
+  }
+
+  function isSidebarOpen() {
+    return el.sidebar && !el.sidebar.classList.contains('hidden');
   }
 
   /* -------------------------------- 搜索 -------------------------------- */
@@ -720,7 +937,8 @@
   async function ensureTextItems(p) {
     if (p.textItems) return p.textItems;
     if (p.src == null) return [];
-    const page = await getPage(p.src);
+    const page = await getPage(p.src, S().pdfDoc);
+    if (!page) return [];
     const viewport = page.getViewport({ scale: S().zoom, rotation: p.rot });
     let tc = cache.textContent.get(p.id);
     if (!tc) {
@@ -777,6 +995,14 @@
 
   App.viewer = {
     init,
+    createView,
+    bindTab,
+    destroyView,
+    onScrollHook,
+    resumeView,
+    isSidebarOpen,
+    buildOutline,
+    isLoading,
     load,
     layout,
     setZoom,

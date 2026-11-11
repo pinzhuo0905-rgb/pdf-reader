@@ -42,6 +42,10 @@ body {
   --shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.08);
   --shadow-page: 0 1px 3px rgba(0, 0, 0, 0.16), 0 4px 12px rgba(0, 0, 0, 0.08);
   --scroll-thumb: rgba(0, 0, 0, 0.28);
+  --tabbar-bg: #e3e5e8;
+  --tab-hover: rgba(255, 255, 255, 0.55);
+  --tab-border: #c9ccd1;
+  --tab-text: #3b3f44;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -70,6 +74,10 @@ body {
   --shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.55);
   --shadow-page: 0 2px 10px rgba(0, 0, 0, 0.6);
   --scroll-thumb: rgba(255, 255, 255, 0.28);
+  --tabbar-bg: #1b1b1b;
+  --tab-hover: rgba(255, 255, 255, 0.07);
+  --tab-border: #3d3d3d;
+  --tab-text: #cfcfcf;
 }
 
 .hidden {
@@ -452,6 +460,25 @@ body {
   background: var(--canvas);
 }
 
+/* 每个标签页一个视图，切换时只切显示 */
+.views {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+}
+
+.view {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+}
+
+.view.active {
+  display: flex;
+}
+
 .scroll-area {
   flex: 1;
   overflow: auto;
@@ -615,10 +642,10 @@ body {
   outline-offset: 1px;
 }
 
-/* ============================ 侧边缩略图 ============================ */
+/* ============================== 目录侧栏 ============================== */
 
 .sidebar {
-  flex: 0 0 196px;
+  flex: 0 0 236px;
   display: flex;
   flex-direction: column;
   background: var(--panel);
@@ -627,55 +654,99 @@ body {
 }
 
 .sidebar-head {
-  height: 38px;
+  height: 40px;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 6px 0 12px;
-  font-size: 12.5px;
-  color: var(--text-dim);
+  padding: 0 6px 0 14px;
   border-bottom: 1px solid var(--panel-border);
 }
 
-.thumbs {
+.sb-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.2px;
+}
+
+.sb-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 10px 8px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+}
+
+/* PDF 自带书签（大纲） */
+.outline {
+  flex: 0 0 auto;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--panel-border);
+  max-height: 40%;
+  overflow-y: auto;
+}
+
+.ol-item {
+  padding: 5px 14px;
+  font-size: 12.5px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ol-item:hover {
+  background: var(--hover-panel);
+}
+
+.thumbs {
+  flex: 1 1 auto;
+  padding: 12px 10px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
 }
 
 .thumb {
-  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.thumb-box {
+  width: 100%;
+  padding: 3px;
   border: 2px solid transparent;
   border-radius: 4px;
-  cursor: pointer;
-  padding: 2px;
 }
 
 .thumb img,
 .thumb canvas {
   display: block;
   width: 100%;
+  height: auto;
   border: 1px solid var(--panel-border);
   background: #fff;
 }
 
-.thumb.current {
+.thumb.current .thumb-box {
   border-color: var(--accent);
-  background: var(--accent-soft);
 }
 
 .thumb .num {
-  position: absolute;
-  right: 4px;
-  bottom: 2px;
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-dim);
-  background: rgba(255, 255, 255, 0.85);
-  padding: 0 3px;
-  border-radius: 2px;
+  line-height: 1;
+}
+
+.thumb.current .num {
+  color: var(--accent);
 }
 
 /* ============================== 搜索条 ============================== */
@@ -1266,4 +1337,200 @@ body {
 
 .op-select:focus {
   border-color: var(--accent);
+}
+
+/* ============================== 标签条 ============================== */
+
+.tabbar {
+  position: relative;
+  flex: 0 0 auto;
+  height: 38px;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 4px 6px 0 8px;
+  background: var(--tabbar-bg);
+  border-bottom: 1px solid var(--tb-border);
+  z-index: 31;
+}
+
+.tabstrip {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: calc(100% - 42px);
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tabstrip::-webkit-scrollbar {
+  display: none;
+}
+
+.tabstrip.overflow {
+  -webkit-mask-image: linear-gradient(to right, #000 94%, transparent 100%);
+}
+
+.tab {
+  position: relative;
+  flex: 0 0 auto;
+  width: 208px;
+  min-width: 84px;
+  max-width: 208px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 4px 0 9px;
+  border-radius: 8px 8px 0 0;
+  color: var(--tab-text);
+  cursor: default;
+  user-select: none;
+  transition: background 0.1s ease;
+}
+
+.tab:hover {
+  background: var(--tab-hover);
+}
+
+.tab.active {
+  height: 33px;
+  margin-bottom: -1px;
+  background: var(--tb-bg);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 var(--tab-border), inset 1px 0 0 var(--tab-border),
+    inset -1px 0 0 var(--tab-border);
+}
+
+.tab.drag-src {
+  opacity: 0.4;
+}
+
+.tab-ico {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.tab-ico.dim {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
+.tab-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-close {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--icon);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.tab-close .ic {
+  width: 12px;
+  height: 12px;
+}
+
+.tab:hover .tab-close,
+.tab.active .tab-close {
+  opacity: 0.7;
+}
+
+.tab-close:hover {
+  background: var(--btn-hover);
+  opacity: 1;
+}
+
+/* 未保存：关闭按钮位置显示小圆点，悬停恢复叉号 */
+.tab.dirty .tab-close .ic {
+  display: none;
+}
+
+.tab.dirty .tab-close::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--icon);
+}
+
+.tab.dirty .tab-close:hover .ic {
+  display: block;
+}
+
+.tab.dirty .tab-close:hover::after {
+  display: none;
+}
+
+.tab-new {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 2px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--icon);
+  cursor: pointer;
+}
+
+.tab-new:hover {
+  background: var(--btn-hover);
+}
+
+.tab-new .ic {
+  pointer-events: none;
+}
+
+/* 拖拽排序时的插入位置提示 */
+.tab-drop {
+  position: absolute;
+  top: 6px;
+  bottom: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 33;
+}
+
+/* 拖拽中的标签页浮影 */
+.tab-ghost {
+  position: fixed;
+  z-index: 9000;
+  height: 32px;
+  margin: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  opacity: 0.94;
+}
+
+.tab-ghost.detach {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
 }

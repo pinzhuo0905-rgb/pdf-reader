@@ -7,17 +7,12 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   try {
     const s = await window.api.getSettings();
-    App.state.settings = s || {};
+    Object.assign(App.settings, s || {});
     App.ui.applyTheme((s && s.theme) || 'light');
   } catch (e) {
-    App.state.settings = {};
+    /* 使用默认设置 */
   }
 
-  // 首屏提示
-  setTimeout(() => {
-    const empty = document.getElementById('empty');
-    if (empty && !empty.classList.contains('hidden')) {
-      // 保持空状态，等待用户操作
-    }
-  }, 100);
+  // 标签页：创建首个空白标签页，并接上文件关联 / 拖出窗口事件
+  App.tabs.init();
 });

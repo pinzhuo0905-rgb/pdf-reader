@@ -14,8 +14,8 @@
   function init() {
     Icons.hydrate();
 
-    // 工具栏
-    $('btn-menu').onclick = (e) => openMainMenu(e.currentTarget);
+    // 工具栏：左上角汉堡按钮展开「目录」侧栏
+    $('btn-menu').onclick = () => toggleSidebar();
     $('btn-undo').onclick = () => App.history.undo();
     $('btn-redo').onclick = () => App.history.redo();
     $('btn-highlight').onclick = () => setTool(S().tool === 'highlight' ? 'select' : 'highlight');
@@ -105,11 +105,9 @@
     // 关闭确认
     window.api.onCloseRequest(() => confirmClose());
 
-    // 打开文件（文件关联）
-    window.api.onOpenFile((p) => openPath(p));
-
     applyTheme('light');
-    App.annotate.attachInteractions($('pages'));
+    // 标注交互绑在标签页容器上（事件委托），每个标签页的页面都在其中
+    App.annotate.attachInteractions($('views'));
     setTool('select');
     setDocState(false);
   }
@@ -136,6 +134,67 @@
     'btn-more',
     'btn-editpdf',
   ];
+
+  /** 左上角汉堡：展开/收起「目录」侧栏 */
+  function toggleSidebar() {
+    if (!S().pdfDoc) {
+      toast('请先打开 PDF 文件');
+      return;
+    }
+    const open = App.viewer.toggleSidebar();
+    $('btn-menu').classList.toggle('active', open);
+  }
+
+  /** 切换标签页时，把该标签页的状态同步到界面 */
+  function syncTabUI(t) {
+    const st = t.state;
+    setDocState(!!st.pdfDoc);
+    $('main').dataset.tool = st.tool;
+
+    Object.entries(TOOL_BUTTONS).forEach(([k, id]) => $(id).classList.toggle('active', k === st.tool));
+    $('grp-highlight').classList.toggle('active', st.tool === 'highlight');
+    $('grp-draw').classList.toggle('active', st.tool === 'draw');
+
+    const map = {
+      select: 'eb-select',
+      textedit: 'eb-textedit',
+      textbox: 'eb-textbox',
+      image: 'eb-image',
+      shape: 'eb-shape',
+      whiteout: 'eb-whiteout',
+    };
+    Object.entries(map).forEach(([k, id]) => $(id).classList.toggle('active', k === st.tool));
+
+    $('editbar').classList.toggle('hidden', !st.editMode);
+    $('btn-editpdf').classList.toggle('primary', !!st.editMode);
+    $('btn-viewmode').classList.toggle('active', !!st.twoUp);
+    $('hl-swatch').style.background = st.opts.highlightColor;
+    renderToolProps();
+    App.history.updateUndoButtons();
+
+    $('empty').classList.toggle('hidden', !!st.pdfDoc);
+    if (!st.pdfDoc) {
+      $('page-input').value = '';
+      $('page-total').textContent = '/ 0';
+    }
+
+    // 搜索条随标签页走
+    if (st.search && st.search.query) {
+      $('searchbar').classList.remove('hidden');
+      $('search-input').value = st.search.query;
+      $('search-count').textContent = st.search.matches.length
+        ? `${st.search.index + 1}/${st.search.matches.length}`
+        : '0/0';
+    } else {
+      $('searchbar').classList.add('hidden');
+      $('search-input').value = '';
+      $('search-count').textContent = '0/0';
+    }
+
+    // OCR 面板显示当前标签页的结果
+    App.ocr.renderList();
+    setTitle();
+  }
 
   /** 没有打开文档时禁用依赖文档的按钮（与 Edge 一致） */
   function setDocState(hasDoc) {
@@ -334,33 +393,6 @@
     });
   }
 
-  function openMainMenu(anchor) {
-    const menu = showMenu(
-      anchor,
-      [
-        menuItemHTML('打开文件…', 'file', 'Ctrl+O'),
-        menuItemHTML('页面缩略图', 'twoPage'),
-        '<div class="menu-sep"></div>',
-        menuItemHTML('文档属性', 'info'),
-        menuItemHTML('快捷键', 'menu'),
-        '<div class="menu-sep"></div>',
-        menuItemHTML('设为默认 PDF 阅读器', 'file'),
-        menuItemHTML('关于', 'info'),
-      ].join('')
-    );
-    bindMenuItems(menu, [
-      openFileDialog,
-      () => {
-        App.viewer.toggleSidebar();
-        App.viewer.buildThumbs();
-      },
-      showDocProps,
-      showShortcuts,
-      () => window.api.openDefaultApps(),
-      showAbout,
-    ]);
-  }
-
   function colorMenuHTML(title, colors, current) {
     return `<div class="menu-title">${title}</div><div class="color-grid">${colors
       .map((c) => `<button data-c="${c}" class="${c === current ? 'on' : ''}" style="background:${c}"></button>`)
@@ -416,6 +448,9 @@
     const menu = showMenu(
       anchor,
       [
+        menuItemHTML('打开文件…', 'file', 'Ctrl+O'),
+        menuItemHTML('新建标签页', 'file', 'Ctrl+T'),
+        '<div class="menu-sep"></div>',
         menuItemHTML('插入图片', 'image'),
         menuItemHTML('插入形状', 'shapes'),
         menuItemHTML('涂改遮盖', 'whiteout'),
@@ -426,9 +461,16 @@
         '<div class="menu-sep"></div>',
         menuItemHTML('文字识别 (OCR)', 'ocr'),
         menuItemHTML('编辑 PDF 内容', 'editText'),
+        '<div class="menu-sep"></div>',
+        menuItemHTML('文档属性', 'info'),
+        menuItemHTML('快捷键', 'menu'),
+        menuItemHTML('设为默认 PDF 阅读器', 'file'),
+        menuItemHTML('关于', 'info'),
       ].join('')
     );
     bindMenuItems(menu, [
+      openFileDialog,
+      () => App.tabs.createBlank(true),
       () => setTool('image'),
       () => openShapeMenu(anchor),
       () => setTool('whiteout'),
@@ -440,6 +482,10 @@
         App.ocr.runPage();
       },
       () => setEditMode(true),
+      showDocProps,
+      showShortcuts,
+      () => window.api.openDefaultApps(),
+      showAbout,
     ]);
   }
 
@@ -529,7 +575,8 @@
     if (p) openPath(p);
   }
 
-  async function openPath(path) {
+  async function openPath(path, page) {
+    if (App.tabs) return App.tabs.openPath(path, page);
     try {
       const res = await window.api.readFile(path);
       const bytes = new Uint8Array(res.data);
@@ -544,7 +591,21 @@
     }
   }
 
+  /** 保存指定标签页（必要时先切过去） */
+  async function saveTab(t) {
+    if (!t) return false;
+    if (App.tabs && App.tabs.active() !== t) {
+      App.tabs.activate(t.id);
+      await new Promise((r) => setTimeout(r, 80));
+    }
+    return save(false);
+  }
+
   function setTitle() {
+    if (App.tabs) {
+      App.tabs.refreshActive();
+      return;
+    }
     const st = S();
     document.title = st.fileName ? `${st.fileName}${st.dirty ? ' *' : ''} - PDF 阅读器` : 'PDF 阅读器';
   }
@@ -720,7 +781,8 @@
   /* ============================== 视图 ============================== */
   function toggleTwoUp() {
     S().twoUp = !S().twoUp;
-    $('pages').classList.toggle('two-up', S().twoUp);
+    const pagesEl = App.viewer.getEl().pages;
+    if (pagesEl) pagesEl.classList.toggle('two-up', S().twoUp);
     $('btn-viewmode').classList.toggle('active', S().twoUp);
     App.viewer.onResize();
   }
@@ -769,7 +831,7 @@
   }
 
   function selectAllText() {
-    const pages = document.querySelectorAll('.page .textLayer');
+    const pages = document.querySelectorAll('#views .view.active .page .textLayer');
     if (!pages.length) return;
     const range = document.createRange();
     range.setStart(pages[0], 0);
@@ -914,6 +976,15 @@
     if (ctrl && key.toLowerCase() === 'o') {
       e.preventDefault();
       openFileDialog();
+    } else if (ctrl && key.toLowerCase() === 't') {
+      e.preventDefault();
+      App.tabs.createBlank(true);
+    } else if (ctrl && key.toLowerCase() === 'w') {
+      e.preventDefault();
+      if (App.tabs.active()) App.tabs.close(App.tabs.active().id);
+    } else if (ctrl && key === 'Tab') {
+      e.preventDefault();
+      App.tabs.next(e.shiftKey ? -1 : 1);
     } else if (ctrl && key.toLowerCase() === 's') {
       e.preventDefault();
       save(e.shiftKey);
@@ -1015,25 +1086,21 @@
         openPath(p);
       } else {
         const buf = new Uint8Array(await file.arrayBuffer());
-        const ok = await App.viewer.load(buf, null, file.name);
-        if (ok) {
-          $('empty').classList.add('hidden');
-          setTitle();
-        }
+        App.tabs.openBytes(buf, file.name);
       }
     });
   }
 
   /* ============================== 关闭确认 ============================== */
   function confirmClose() {
-    if (!S().dirty) {
+    const all = App.tabs ? App.tabs.list : [];
+    const dirty = all.filter((t) => t.state.dirty);
+    if (!dirty.length) {
       window.api.allowClose();
       return;
     }
-    showModal(
-      '保存更改？',
-      '文档中有尚未保存的修改，是否在关闭前保存？',
-      [
+    if (dirty.length === 1 && App.tabs.active() === dirty[0]) {
+      showModal('保存更改？', '文档中有尚未保存的修改，是否在关闭前保存？', [
         { label: '取消' },
         { label: '不保存', onClick: () => window.api.allowClose() },
         {
@@ -1044,6 +1111,17 @@
             if (ok) window.api.allowClose();
           },
         },
+      ]);
+      return;
+    }
+    showModal(
+      '有未保存的修改',
+      `共有 ${dirty.length} 个标签页存在尚未保存的修改：<br/><span style="color:var(--text-dim)">${dirty
+        .map((t) => escapeHtml(t.state.fileName || '新标签页'))
+        .join('、')}</span>`,
+      [
+        { label: '取消' },
+        { label: '不保存并关闭', onClick: () => window.api.allowClose() },
       ]
     );
   }
@@ -1059,6 +1137,9 @@
     applyTheme,
     updateZoomLabel,
     setDocState,
+    syncTabUI,
+    saveTab,
+    toggleSidebar,
     copySelection,
     selectAllText,
     openPath,

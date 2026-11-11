@@ -15,6 +15,8 @@ const SHOTS = [
   ['test/e2e/scenes/02-annotate.js', 'docs/screenshots/02-annotate.png', 8000],
   ['test/e2e/scenes/03-ocr.js', 'docs/screenshots/03-ocr.png', 14000],
   ['test/e2e/scenes/04-search.js', 'docs/screenshots/04-search.png', 9000],
+  ['test/e2e/scenes/05-tabs.js', 'docs/screenshots/05-tabs.png', 11000],
+  ['test/e2e/scenes/06-tab-drag.js', 'docs/screenshots/06-tab-drag.png', 10000],
 ];
 
 const isWin = process.platform === 'win32';

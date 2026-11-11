@@ -23,7 +23,8 @@
         commit();
       }
     });
-    App.viewer.getEl().scroll.addEventListener('scroll', () => {
+    // 任一标签页滚动时收起编辑浮层
+    App.viewer.onScrollHook(() => {
       if (!el.box.classList.contains('hidden')) cancel();
     });
   }

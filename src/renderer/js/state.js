@@ -1,4 +1,4 @@
-/* 全局状态与数据模型 */
+/* 全局状态与数据模型：每个标签页各自持有一份文档状态 */
 (function () {
   const App = (window.App = window.App || {});
 
@@ -12,50 +12,64 @@
   let seq = 0;
   const newId = () => 'a' + Date.now().toString(36) + (seq++).toString(36);
 
-  const state = {
-    /* 文档 */
-    filePath: null,
-    fileName: null,
-    bytes: null,
-    pdfDoc: null,
-    numPagesSrc: 0,
-    /** 显示页列表：{id, src|null, rot, wPt, hPt, el, ...} */
-    pages: [],
-    /** pageId -> 标注数组 */
-    annots: new Map(),
-    /* 视图 */
-    zoom: 1,
-    zoomMode: 'auto',
-    currentPage: 0,
-    twoUp: false,
-    /* 工具 */
-    tool: 'select',
-    editMode: false,
-    opts: {
-      highlightColor: COLORS.highlight[0],
-      penColor: COLORS.pen[1],
-      penWidth: 3,
-      textColor: COLORS.text[0],
-      fontSize: 14,
-      shapeKind: 'rect',
-      shapeColor: COLORS.shape[0],
-      shapeWidth: 2,
-    },
-    selected: null, // {pageId, annotId}
-    /* 其它 */
-    dirty: false,
-    history: [],
-    hIndex: -1,
-    search: { query: '', matches: [], index: -1 },
-    ocr: null,
-    settings: {},
-    COLORS,
-    newId,
-  };
+  /** 跨标签页共享的设置（主题、OCR 语言、上次打开目录…） */
+  App.settings = App.settings || {};
+
+  /**
+   * 创建一个「文档状态」。每个标签页一份，互不影响：
+   * 页码、缩放、工具、标注、撤销栈、搜索结果、OCR 结果都随标签页走。
+   */
+  function createDocState() {
+    return {
+      /* 文档 */
+      filePath: null,
+      fileName: null,
+      bytes: null,
+      pdfDoc: null,
+      numPagesSrc: 0,
+      /** 显示页列表：{id, src|null, rot, wPt, hPt, el, ...} */
+      pages: [],
+      /** pageId -> 标注数组 */
+      annots: new Map(),
+      /* 视图 */
+      zoom: 1,
+      zoomMode: 'auto',
+      currentPage: 0,
+      twoUp: false,
+      /* 工具 */
+      tool: 'select',
+      editMode: false,
+      opts: {
+        highlightColor: COLORS.highlight[0],
+        penColor: COLORS.pen[1],
+        penWidth: 3,
+        textColor: COLORS.text[0],
+        fontSize: 14,
+        shapeKind: 'rect',
+        shapeColor: COLORS.shape[0],
+        shapeWidth: 2,
+      },
+      selected: null, // {pageId, annotId}
+      /* 其它 */
+      dirty: false,
+      history: [],
+      hIndex: -1,
+      search: { query: '', matches: [], index: -1 },
+      ocr: null,
+      outline: null,
+      /* 共享引用（保持旧代码 S().settings 可用） */
+      settings: App.settings,
+      COLORS,
+      newId,
+    };
+  }
+
+  const S = () => App.state;
 
   /* ------------------------------ 历史记录 ------------------------------ */
   function snapshot() {
-    const pages = state.pages.map((p) => ({
+    const s = S();
+    const pages = s.pages.map((p) => ({
       id: p.id,
       src: p.src,
       rot: p.rot,
@@ -63,34 +77,37 @@
       baseH: p.baseH,
     }));
     const annots = {};
-    state.annots.forEach((list, id) => (annots[id] = JSON.parse(JSON.stringify(list))));
+    s.annots.forEach((list, id) => (annots[id] = JSON.parse(JSON.stringify(list))));
     return JSON.stringify({ pages, annots });
   }
 
   function pushHistory() {
+    const s = S();
     const snap = snapshot();
-    if (state.history[state.hIndex] === snap) return;
-    state.history = state.history.slice(0, state.hIndex + 1);
-    state.history.push(snap);
-    if (state.history.length > 80) state.history.shift();
-    state.hIndex = state.history.length - 1;
+    if (s.history[s.hIndex] === snap) return;
+    s.history = s.history.slice(0, s.hIndex + 1);
+    s.history.push(snap);
+    if (s.history.length > 80) s.history.shift();
+    s.hIndex = s.history.length - 1;
     updateUndoButtons();
   }
 
   function resetHistory() {
-    state.history = [];
-    state.hIndex = -1;
+    const s = S();
+    s.history = [];
+    s.hIndex = -1;
     pushHistory();
   }
 
   function restore(snap) {
+    const s = S();
     const data = JSON.parse(snap);
     // 页面结构变化时才重建
     const changed =
-      data.pages.length !== state.pages.length ||
-      data.pages.some((p, i) => !state.pages[i] || state.pages[i].id !== p.id || state.pages[i].rot !== p.rot);
-    state.annots = new Map();
-    Object.entries(data.annots).forEach(([k, v]) => state.annots.set(k, v));
+      data.pages.length !== s.pages.length ||
+      data.pages.some((p, i) => !s.pages[i] || s.pages[i].id !== p.id || s.pages[i].rot !== p.rot);
+    s.annots = new Map();
+    Object.entries(data.annots).forEach(([k, v]) => s.annots.set(k, v));
     if (changed) {
       App.viewer.setPageModel(data.pages);
     } else {
@@ -102,49 +119,59 @@
   }
 
   function undo() {
-    if (state.hIndex <= 0) return;
-    state.hIndex--;
-    restore(state.history[state.hIndex]);
-    state.dirty = true;
+    const s = S();
+    if (s.hIndex <= 0) return;
+    s.hIndex--;
+    restore(s.history[s.hIndex]);
+    s.dirty = true;
+    App.ui.setTitle();
   }
 
   function redo() {
-    if (state.hIndex >= state.history.length - 1) return;
-    state.hIndex++;
-    restore(state.history[state.hIndex]);
-    state.dirty = true;
+    const s = S();
+    if (s.hIndex >= s.history.length - 1) return;
+    s.hIndex++;
+    restore(s.history[s.hIndex]);
+    s.dirty = true;
+    App.ui.setTitle();
   }
 
   function updateUndoButtons() {
+    const s = S();
     const u = document.getElementById('btn-undo');
     const r = document.getElementById('btn-redo');
-    if (u) u.disabled = state.hIndex <= 0;
-    if (r) r.disabled = state.hIndex >= state.history.length - 1;
+    if (u) u.disabled = s.hIndex <= 0;
+    if (r) r.disabled = s.hIndex >= s.history.length - 1;
   }
 
   /* ------------------------------ 标注存取 ------------------------------ */
   function getAnnots(pageId) {
-    if (!state.annots.has(pageId)) state.annots.set(pageId, []);
-    return state.annots.get(pageId);
+    const s = S();
+    if (!s.annots.has(pageId)) s.annots.set(pageId, []);
+    return s.annots.get(pageId);
   }
 
   function addAnnot(pageId, annot) {
+    const s = S();
     annot.id = annot.id || newId();
     getAnnots(pageId).push(annot);
-    state.dirty = true;
+    s.dirty = true;
     pushHistory();
     App.viewer.refreshOverlays();
+    App.ui.setTitle();
     return annot;
   }
 
   function removeAnnot(pageId, annotId) {
+    const s = S();
     const list = getAnnots(pageId);
     const i = list.findIndex((a) => a.id === annotId);
     if (i >= 0) {
       list.splice(i, 1);
-      state.dirty = true;
+      s.dirty = true;
       pushHistory();
       App.viewer.refreshOverlays();
+      App.ui.setTitle();
       return true;
     }
     return false;
@@ -155,11 +182,12 @@
   }
 
   function hasAnnots() {
-    for (const list of state.annots.values()) if (list.length) return true;
+    for (const list of S().annots.values()) if (list.length) return true;
     return false;
   }
 
-  App.state = state;
+  App.state = createDocState();
+  App.createDocState = createDocState;
   App.COLORS = COLORS;
   App.history = { push: pushHistory, reset: resetHistory, undo, redo, updateUndoButtons };
   App.annots = { get: getAnnots, add: addAnnot, remove: removeAnnot, find: findAnnot, has: hasAnnots };

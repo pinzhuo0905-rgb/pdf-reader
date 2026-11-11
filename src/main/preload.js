@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('api', {
   ocrRecognize: (img) => ipcRenderer.invoke('ocr:recognize', img),
   openDefaultApps: () => ipcRenderer.invoke('shell:defaultApps'),
   allowClose: () => ipcRenderer.invoke('app:allow-close'),
+  detachTab: (payload) => ipcRenderer.invoke('tab:detach', payload),
   pathForFile: (file) => {
     try {
       return webUtils.getPathForFile(file);

@@ -11,6 +11,17 @@
   </head>
   <body>
     <div id="app" class="theme-light">
+      <!-- ============================= 标签条 ============================= -->
+      <div id="tabbar" class="tabbar">
+        <div id="tabstrip" class="tabstrip"></div>
+        <button id="tab-new" class="tab-new" title="新建标签页 (Ctrl+T)">
+          <svg class="ic" width="16" height="16" viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M10 4.2v11.6M4.2 10h11.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </button>
+        <div id="tabDrop" class="tab-drop hidden"></div>
+      </div>
+
       <!-- ============================== 工具栏 ============================== -->
       <header id="toolbar" class="toolbar">
         <div class="tb-left">
@@ -98,15 +109,17 @@
       <main id="main" class="main">
         <aside id="sidebar" class="sidebar hidden">
           <div class="sidebar-head">
-            <span>页面缩略图</span>
-            <button class="icon-btn sm" id="sidebar-close" data-icon="close" title="关闭"></button>
+            <span class="sb-title">目录</span>
+            <button class="icon-btn sm" id="sidebar-close" data-icon="close" title="关闭目录"></button>
           </div>
-          <div class="thumbs" id="thumbs"></div>
+          <div class="sb-body">
+            <div id="outline" class="outline hidden"></div>
+            <div class="thumbs" id="thumbs"></div>
+          </div>
         </aside>
 
-        <div id="scrollArea" class="scroll-area">
-          <div id="pages" class="pages"></div>
-        </div>
+        <!-- 每个标签页在这里各有一份滚动区与页面容器 -->
+        <div id="views" class="views"></div>
 
         <!-- 搜索浮层 -->
         <div id="searchbar" class="searchbar hidden">
@@ -206,6 +219,7 @@
     <script src="js/textedit.js"></script>
     <script src="js/exporter.js"></script>
     <script src="js/ocr.js"></script>
+    <script src="js/tabs.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/app.js"></script>
   </body>

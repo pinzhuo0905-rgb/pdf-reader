@@ -10,6 +10,7 @@ const {
   protocol,
   net,
   nativeTheme,
+  screen,
 } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -28,8 +29,6 @@ if (!gotLock) {
   app.quit();
 }
 
-let mainWindow = null;
-let pendingFilePath = null;
 
 /** 从命令行参数中解析出待打开的 pdf 路径 */
 function pdfFromArgv(argv) {
@@ -114,10 +113,24 @@ function writeSettings(patch) {
 const DEV_HOOK = !app.isPackaged && !!(process.env.PDFREADER_TEST || process.env.PDFREADER_SHOT);
 const HEADLESS = DEV_HOOK;
 
-function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 860,
+/** 所有窗口（多窗口 = 标签页被拖出后的独立窗口） */
+const windows = new Set();
+let mainWindow = null;
+let devHooked = false;
+
+/**
+ * 创建窗口。
+ * opts.file  启动时要打开的 PDF（会作为该窗口的一个标签页）
+ * opts.page  打开后跳到的页码（1 起）
+ * opts.bounds 窗口位置与大小（拖出标签页时落在鼠标附近）
+ */
+function createWindow(opts = {}) {
+  const b = opts.bounds || {};
+  const win = new BrowserWindow({
+    width: b.width || 1280,
+    height: b.height || 860,
+    x: b.x,
+    y: b.y,
     minWidth: 640,
     minHeight: 480,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1f1f1f' : '#f5f5f5',
@@ -137,79 +150,151 @@ function createWindow() {
     },
   });
 
+  win.__allowClose = false;
+  win.__pendingOpen = opts.file ? { path: opts.file, page: opts.page || 0 } : null;
+  windows.add(win);
+  mainWindow = win;
+
   Menu.setApplicationMenu(null);
-  mainWindow.setMenuBarVisibility(false);
+  win.setMenuBarVisibility(false);
 
-  mainWindow.loadURL('app://bundle/index.html');
+  win.loadURL('app://bundle/index.html');
 
-  mainWindow.once('ready-to-show', () => {
-    if (!HEADLESS) mainWindow.show();
-    if (pendingFilePath) {
-      mainWindow.webContents.send('open-file', pendingFilePath);
-      pendingFilePath = null;
+  win.once('ready-to-show', () => {
+    if (!HEADLESS) win.show();
+    if (win.__pendingOpen) {
+      win.webContents.send('open-file', win.__pendingOpen);
+      win.__pendingOpen = null;
     }
-    // 开发自检：执行测试脚本 / 截图后退出（打包后不生效）
-    if (DEV_HOOK) {
-      setTimeout(async () => {
-        if (process.env.PDFREADER_TEST) {
-          try {
-            const code = fs.readFileSync(process.env.PDFREADER_TEST, 'utf8');
-            const res = await mainWindow.webContents.executeJavaScript(code, true);
-            console.log('TEST_RESULT:' + JSON.stringify(res));
-          } catch (e) {
-            console.log('TEST_ERROR:' + (e && e.message));
-          }
-        }
-        if (process.env.PDFREADER_SHOT) {
-          try {
-            // 强制重绘，避免截到旧帧
-            mainWindow.webContents.invalidate();
-            await new Promise((r) => setTimeout(r, 1200));
-            const img = await mainWindow.webContents.capturePage();
-            fs.writeFileSync(process.env.PDFREADER_SHOT, img.toPNG());
-            console.log('shot saved');
-          } catch (e) {
-            console.error(e);
-          }
-        }
-        app.quit();
-      }, Number(process.env.PDFREADER_SHOT_DELAY || 4000));
+    // 开发自检只在第一个窗口里跑一次，避免新建窗口重复执行
+    if (DEV_HOOK && !devHooked) {
+      devHooked = true;
+      attachDevHook(win);
     }
   });
 
   // 外部链接用系统浏览器打开
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/i.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
+  win.on('focus', () => {
+    mainWindow = win;
+  });
+
+  // 开发期把渲染进程的报错转发到终端，便于无头自检
+  if (DEV_HOOK) {
+    win.webContents.on('console-message', (...args) => {
+      let level = 0;
+      let message = '';
+      if (args[0] && typeof args[0] === 'object' && 'message' in args[0]) {
+        level = args[0].level === 'error' ? 3 : args[0].level === 'warning' ? 2 : 0;
+        message = args[0].message;
+      } else {
+        level = args[1];
+        message = args[2];
+      }
+      if (level >= 2) console.log('RENDERER:' + message);
+    });
+    win.webContents.on('preload-error', (_e, p, err) => console.log('PRELOAD_ERR:' + err.message));
+  }
+
+  win.on('closed', () => {
+    windows.delete(win);
+    if (mainWindow === win) mainWindow = [...windows].pop() || null;
   });
 
   // 有未保存修改时拦截关闭
-  mainWindow.on('close', (e) => {
-    if (!allowClose) {
+  win.on('close', (e) => {
+    if (!win.__allowClose) {
       e.preventDefault();
-      mainWindow.webContents.send('close-request');
+      win.webContents.send('close-request');
     }
   });
+
+  return win;
 }
 
-let allowClose = false;
+/** 开发期自检：跑测试脚本 / 截图后退出（打包后不生效） */
+function attachDevHook(win) {
+  setTimeout(async () => {
+    if (process.env.PDFREADER_TEST) {
+      try {
+        const code = fs.readFileSync(process.env.PDFREADER_TEST, 'utf8');
+        const res = await win.webContents.executeJavaScript(code, true);
+        console.log('TEST_RESULT:' + JSON.stringify(res));
+      } catch (e) {
+        console.log('TEST_ERROR:' + (e && e.message));
+      }
+    }
+    console.log('WINDOWS:' + windows.size);
+    // 可选：核对被拖出的窗口里确实打开了对应文档
+    if (process.env.PDFREADER_DETACH_CHECK) {
+      await new Promise((r) => setTimeout(r, 3000));
+      for (const w of windows) {
+        if (w === win || w.isDestroyed()) continue;
+        try {
+          const info = await w.webContents.executeJavaScript(
+            '({ tabs: App.tabs.list.map((t) => t.state.fileName), pages: App.state.pages.length, hasDoc: !!App.state.pdfDoc, tabEls: document.querySelectorAll("#tabstrip .tab").length })',
+            true
+          );
+          console.log('DETACHED:' + JSON.stringify(info));
+        } catch (e) {
+          console.log('DETACHED_ERR:' + (e && e.message));
+        }
+      }
+    }
+    if (process.env.PDFREADER_SHOT) {
+      try {
+        // 强制重绘，避免截到旧帧
+        win.webContents.invalidate();
+        await new Promise((r) => setTimeout(r, 1200));
+        const img = await win.webContents.capturePage();
+        fs.writeFileSync(process.env.PDFREADER_SHOT, img.toPNG());
+        console.log('shot saved');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    app.quit();
+  }, Number(process.env.PDFREADER_SHOT_DELAY || 4000));
+}
 
-ipcMain.handle('app:allow-close', () => {
-  allowClose = true;
-  if (mainWindow) mainWindow.close();
+ipcMain.handle('app:allow-close', (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (!win) return false;
+  win.__allowClose = true;
+  win.close();
+  return true;
+});
+
+/** 标签页被拖出标签条：在鼠标位置开一个新窗口，并打开同一个文件 */
+ipcMain.handle('tab:detach', (e, payload) => {
+  if (!payload || !payload.path) return false;
+  const src = BrowserWindow.fromWebContents(e.sender);
+  const sb = src ? src.getBounds() : { width: 1280, height: 860 };
+  const pt = screen.getCursorScreenPoint();
+  const area = screen.getDisplayNearestPoint(pt).workArea;
+  const width = Math.min(sb.width, area.width);
+  const height = Math.min(sb.height, area.height);
+  const x = Math.round(Math.min(Math.max(pt.x - 180, area.x), area.x + area.width - width));
+  const y = Math.round(Math.min(Math.max(pt.y - 16, area.y), area.y + area.height - height));
+  createWindow({
+    file: payload.path,
+    page: payload.page || 0,
+    bounds: { x, y, width, height },
+  });
   return true;
 });
 
 app.on('second-instance', (_e, argv) => {
   const file = pdfFromArgv(argv);
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
-    if (file) mainWindow.webContents.send('open-file', file);
+  const win = mainWindow || [...windows][0];
+  if (win) {
+    if (win.isMinimized()) win.restore();
+    win.focus();
+    if (file) win.webContents.send('open-file', { path: file });
   }
 });
 
@@ -237,7 +322,7 @@ app.whenReady().then(() => {
     }
   });
 
-  pendingFilePath = pdfFromArgv(process.argv);
+  const startupFile = pdfFromArgv(process.argv);
 
   // 打包后自检：验证 OCR 模型与原生推理库可用（不读取外部脚本）
   if (process.env.PDFREADER_OCR_SELFTEST) {
@@ -273,7 +358,7 @@ app.whenReady().then(() => {
     return;
   }
 
-  createWindow();
+  createWindow({ file: startupFile });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -287,15 +372,16 @@ app.on('window-all-closed', () => {
 // 通过文件关联双击打开（macOS 风格事件，Windows 下也走 open-file 的情况极少）
 app.on('open-file', (event, filePath) => {
   event.preventDefault();
-  if (mainWindow) mainWindow.webContents.send('open-file', filePath);
-  else pendingFilePath = filePath;
+  const win = mainWindow || [...windows][0];
+  if (win) win.webContents.send('open-file', { path: filePath });
+  else createWindow({ file: filePath });
 });
 
 /* --------------------------------- IPC --------------------------------- */
 
-ipcMain.handle('dialog:open', async () => {
+ipcMain.handle('dialog:open', async (e) => {
   const settings = readSettings();
-  const res = await dialog.showOpenDialog(mainWindow, {
+  const res = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender) || mainWindow, {
     title: '打开',
     defaultPath: settings.lastDir || undefined,
     filters: [{ name: 'PDF 文档', extensions: ['pdf'] }],
@@ -326,9 +412,9 @@ ipcMain.handle('file:save', async (_e, filePath, data) => {
   return { ok: true, path: filePath };
 });
 
-ipcMain.handle('dialog:saveAs', async (_e, suggestedName, data) => {
+ipcMain.handle('dialog:saveAs', async (e, suggestedName, data) => {
   const settings = readSettings();
-  const res = await dialog.showSaveDialog(mainWindow, {
+  const res = await dialog.showSaveDialog(BrowserWindow.fromWebContents(e.sender) || mainWindow, {
     title: '另存为',
     defaultPath: path.join(settings.lastDir || app.getPath('documents'), suggestedName || '未命名.pdf'),
     filters: [{ name: 'PDF 文档', extensions: ['pdf'] }],
@@ -411,14 +497,18 @@ ipcMain.handle('app:version', () => ({
   chrome: process.versions.chrome,
 }));
 
-ipcMain.handle('window:fullscreen', (_e, value) => {
-  if (!mainWindow) return false;
-  const next = typeof value === 'boolean' ? value : !mainWindow.isFullScreen();
-  mainWindow.setFullScreen(next);
+ipcMain.handle('window:fullscreen', (e, value) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (!win) return false;
+  const next = typeof value === 'boolean' ? value : !win.isFullScreen();
+  win.setFullScreen(next);
   return next;
 });
 
-ipcMain.handle('window:isFullscreen', () => (mainWindow ? mainWindow.isFullScreen() : false));
+ipcMain.handle('window:isFullscreen', (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  return win ? win.isFullScreen() : false;
+});
 
 // 打印：由渲染进程提供页面图片与尺寸，这里开一个隐藏窗口打印
 ipcMain.handle('print:pages', async (_e, payload) => {
@@ -434,7 +524,7 @@ ipcMain.handle('print:pages', async (_e, payload) => {
   await win.loadURL(pathToFileURL(tmpFile).toString());
   return new Promise((resolve) => {
     win.webContents.print({ silent: false, printBackground: true }, (success, reason) => {
-      win.close();
+      if (!win.isDestroyed()) win.close();
       fsp.unlink(tmpFile).catch(() => {});
       resolve({ success, reason });
     });

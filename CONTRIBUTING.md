@@ -95,6 +95,14 @@ PDFREADER_TEST=test/e2e/interact.js npx electron . test/fixtures/sample.pdf
 # OCR：整页识别 + 插入文本框 + 导出 PDF
 PDFREADER_TEST=test/e2e/ocr.js npx electron . test/fixtures/sample.pdf
 
+# 多标签页：打开/去重/排序/拖出成窗口/关闭/状态隔离 + 目录侧栏
+PDFREADER_TEST=test/e2e/tabs.js npx electron . test/fixtures/sample.pdf
+
+# 也可以直接跑封装好的脚本（自带延时与退出）
+npm run test:interact
+npm run test:ocr
+npm run test:tabs
+
 # 截图（输出到指定路径后退出）
 PDFREADER_SHOT=shot.png npx electron . test/fixtures/sample.pdf
 ```
