@@ -137,6 +137,9 @@ function createWindow(opts = {}) {
     icon: path.join(ASSETS_DIR, 'pdf-icon-256.png'),
     title: 'PDF Reader',
     show: false,
+    // 无边框：最小化/最大化/关闭按钮由渲染层画在标签条同一行
+    frame: false,
+    thickFrame: true,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -182,6 +185,13 @@ function createWindow(opts = {}) {
   win.on('focus', () => {
     mainWindow = win;
   });
+
+  // 最大化状态变化 -> 通知渲染层切换「最大化/还原」图标
+  const sendMaxState = (v) => {
+    if (!win.isDestroyed()) win.webContents.send('window:maximized', v);
+  };
+  win.on('maximize', () => sendMaxState(true));
+  win.on('unmaximize', () => sendMaxState(false));
 
   // 开发期把渲染进程的报错转发到终端，便于无头自检
   if (DEV_HOOK) {
@@ -496,6 +506,33 @@ ipcMain.handle('app:version', () => ({
   electron: process.versions.electron,
   chrome: process.versions.chrome,
 }));
+
+/* ---------------------------- 自绘窗口按钮 ---------------------------- */
+
+ipcMain.handle('window:minimize', (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (win) win.minimize();
+  return true;
+});
+
+ipcMain.handle('window:toggleMaximize', (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (!win) return false;
+  if (win.isMaximized()) win.unmaximize();
+  else win.maximize();
+  return win.isMaximized();
+});
+
+ipcMain.handle('window:close', (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (win) win.close(); // 走 close 拦截：有未保存修改时由渲染层确认
+  return true;
+});
+
+ipcMain.handle('window:isMaximized', (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  return win ? win.isMaximized() : false;
+});
 
 ipcMain.handle('window:fullscreen', (e, value) => {
   const win = BrowserWindow.fromWebContents(e.sender);

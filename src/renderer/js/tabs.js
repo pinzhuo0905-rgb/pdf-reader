@@ -30,6 +30,7 @@
 
     window.addEventListener('pointermove', onDragMove);
     window.addEventListener('pointerup', onDragUp);
+    window.addEventListener('resize', () => fitTabs());
 
     // 文件关联 / 从其它窗口拖出的标签页
     window.api.onOpenFile((payload) => {
@@ -79,6 +80,7 @@
       if (x.dom) x.dom.view.classList.toggle('active', x === t);
     }
     paintStrip();
+    scrollActiveIntoView();
     App.ui.syncTabUI(t);
     requestAnimationFrame(() => {
       if (tabs.activeId !== id) return;
@@ -256,7 +258,40 @@
       el.appendChild(btn);
       strip.appendChild(el);
     }
+    fitTabs();
     updateScrollable();
+  }
+
+  /**
+   * 按数量均分标签宽度：放得下保持 208px，放不下整体收窄，
+   * 收到 72px 仍放不下才横向滚动（与浏览器一致，标签之间不会重叠）
+   */
+  function fitTabs() {
+    const strip = $('tabstrip');
+    const bar = $('tabbar');
+    if (!strip || !bar) return;
+    const n = tabs.list.length;
+    if (!n) return;
+    const cs = getComputedStyle(bar);
+    const inner =
+      bar.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0) - 34;
+    const gap = 2;
+    let w = Math.floor((inner - gap * (n - 1)) / n);
+    w = Math.max(72, Math.min(208, w));
+    strip.style.setProperty('--tab-w', w + 'px');
+    strip.classList.toggle('narrow', w < 122);
+  }
+
+  /** 让当前标签保持在可见区域内 */
+  function scrollActiveIntoView() {
+    const strip = $('tabstrip');
+    if (!strip || strip.scrollWidth <= strip.clientWidth + 2) return;
+    const el = strip.querySelector('.tab.active');
+    if (!el) return;
+    const sr = strip.getBoundingClientRect();
+    const er = el.getBoundingClientRect();
+    if (er.left < sr.left) strip.scrollLeft -= sr.left - er.left + 8;
+    else if (er.right > sr.right) strip.scrollLeft += er.right - sr.right + 8;
   }
 
   /** 标签过多时给标签条加渐隐提示 */
@@ -285,6 +320,7 @@
       const ico = el.querySelector('.tab-ico');
       if (ico) ico.classList.toggle('dim', !x.state.pdfDoc);
     });
+    fitTabs();
     updateScrollable();
   }
 

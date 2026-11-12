@@ -1348,16 +1348,22 @@ body {
   display: flex;
   align-items: flex-end;
   gap: 4px;
-  padding: 4px 6px 0 8px;
+  /* 右侧留出 3 个窗口按钮的宽度（3 × 46px） */
+  padding: 4px 138px 0 8px;
   background: var(--tabbar-bg);
   border-bottom: 1px solid var(--tb-border);
   z-index: 31;
+  /* 无边框窗口：整条标签栏可拖动窗口 */
+  -webkit-app-region: drag;
+  user-select: none;
 }
 
 .tabstrip {
   flex: 0 1 auto;
   min-width: 0;
-  max-width: calc(100% - 42px);
+  max-width: calc(100% - 40px);
+  /* 标签要接收鼠标事件，不能算作拖动区域 */
+  -webkit-app-region: no-drag;
   display: flex;
   align-items: flex-end;
   gap: 2px;
@@ -1377,8 +1383,9 @@ body {
 .tab {
   position: relative;
   flex: 0 0 auto;
-  width: 208px;
-  min-width: 84px;
+  /* 标签多时由 JS 写入 --tab-w 均分收窄，最少 72px */
+  width: var(--tab-w, 208px);
+  min-width: 72px;
   max-width: 208px;
   height: 32px;
   display: flex;
@@ -1460,6 +1467,11 @@ body {
   opacity: 1;
 }
 
+/* 标签很窄时（多标签）隐藏关闭按钮，避免挤成一团 */
+.tabstrip.narrow .tab-close {
+  display: none;
+}
+
 /* 未保存：关闭按钮位置显示小圆点，悬停恢复叉号 */
 .tab.dirty .tab-close .ic {
   display: none;
@@ -1484,6 +1496,7 @@ body {
 .tab-new {
   flex: 0 0 auto;
   width: 30px;
+  -webkit-app-region: no-drag;
   height: 30px;
   margin-bottom: 2px;
   display: grid;
@@ -1501,6 +1514,55 @@ body {
 }
 
 .tab-new .ic {
+  pointer-events: none;
+}
+
+/* 窗口按钮：最小化 / 最大化(还原) / 关闭，与标签同一行 */
+.win-controls {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 38px;
+  display: flex;
+  align-items: stretch;
+  -webkit-app-region: no-drag;
+  z-index: 2;
+}
+
+.win-btn {
+  width: 46px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--icon);
+  cursor: default;
+  transition: background 0.1s ease;
+}
+
+.win-btn:hover {
+  background: var(--btn-hover);
+}
+
+.win-btn:active {
+  background: var(--btn-active);
+}
+
+.win-btn.close:hover {
+  background: #e81123;
+  color: #fff;
+}
+
+.win-btn.close:active {
+  background: #c50f1f;
+  color: #fff;
+}
+
+.win-btn .ic {
+  width: 12px;
+  height: 12px;
   pointer-events: none;
 }
 

@@ -13,6 +13,7 @@
   /* ============================== 初始化 ============================== */
   function init() {
     Icons.hydrate();
+    initWindowControls();
 
     // 工具栏：左上角汉堡按钮展开「目录」侧栏
     $('btn-menu').onclick = () => toggleSidebar();
@@ -134,6 +135,33 @@
     'btn-more',
     'btn-editpdf',
   ];
+
+  /* ============================ 自绘窗口按钮 ============================ */
+
+  function initWindowControls() {
+    const min = $('win-min');
+    const max = $('win-max');
+    const close = $('win-close');
+    if (!min || !max || !close) return;
+
+    min.onclick = () => window.api.minimizeWindow();
+    max.onclick = () => window.api.toggleMaximize();
+    close.onclick = () => window.api.closeWindow();
+
+    window.api.onMaximized((v) => setMaxIcon(v));
+    window.api
+      .isMaximized()
+      .then(setMaxIcon)
+      .catch(() => {});
+  }
+
+  /** 最大化时把按钮图标换成「还原」 */
+  function setMaxIcon(max) {
+    const btn = $('win-max');
+    if (!btn) return;
+    btn.innerHTML = Icons.svg(max ? 'winRestore' : 'winMax');
+    btn.title = max ? '向下还原' : '最大化';
+  }
 
   /** 左上角汉堡：展开/收起「目录」侧栏 */
   function toggleSidebar() {

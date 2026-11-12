@@ -840,15 +840,31 @@
         c.fillRect(0, 0, canvas.width, canvas.height);
         return;
       }
+      // 主画布已画好：直接缩放过来，既快又不会和主渲染抢同一页
+      if (p.rendered && p.canvas.width > 1) {
+        const w = Math.max(1, Math.round(p.wPt * scale));
+        const h = Math.max(1, Math.round(p.hPt * scale));
+        canvas.width = w;
+        canvas.height = h;
+        const c = canvas.getContext('2d', { alpha: false });
+        c.fillStyle = '#fff';
+        c.fillRect(0, 0, w, h);
+        c.drawImage(p.canvas, 0, 0, w, h);
+        return;
+      }
+      // 还没画过：等主渲染结束再单独渲染，避免并发导致缩略图变黑
+      for (let i = 0; i < 40 && p.rendering; i++) await new Promise((r) => setTimeout(r, 60));
       const page = await getPage(p.src, S().pdfDoc);
       if (!page) return;
       const vp = page.getViewport({ scale, rotation: p.rot });
       canvas.width = Math.round(vp.width);
       canvas.height = Math.round(vp.height);
       const ctx = canvas.getContext('2d', { alpha: false });
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       await page.render({ canvasContext: ctx, viewport: vp }).promise;
     } catch (e) {
-      /* 忽略 */
+      /* 忽略：缩略图失败不影响阅读 */
     }
   }
 
