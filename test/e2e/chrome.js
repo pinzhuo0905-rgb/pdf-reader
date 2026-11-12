@@ -86,7 +86,14 @@
     g = geo();
     assert('widthRestored', g.tabs.every((t) => t.w === 208), g.tabs.map((t) => t.w));
 
-    // 6) 最大化 / 还原
+    // 6) 最大化 / 还原（无头自检模式下跳过：真最大化会把隐藏窗口弹到屏幕上）
+    if (window.api.headless) {
+      out.maximizeToggle = 'skip (headless)';
+      out.iconSwitches = 'skip (headless)';
+      const failedH = Object.entries(out).filter(([, v]) => String(v).startsWith('FAIL'));
+      out.result = failedH.length ? 'FAILED: ' + failedH.map(([k]) => k).join(',') : 'ALL PASS';
+      return out;
+    }
     const before = await window.api.isMaximized();
     document.getElementById('win-max').click();
     await sleep(800);

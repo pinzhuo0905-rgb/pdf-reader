@@ -511,13 +511,15 @@ ipcMain.handle('app:version', () => ({
 
 ipcMain.handle('window:minimize', (e) => {
   const win = BrowserWindow.fromWebContents(e.sender);
-  if (win) win.minimize();
+  // 自检模式窗口是隐藏的，最小化/最大化会把它弹到屏幕上，直接忽略
+  if (win && !HEADLESS) win.minimize();
   return true;
 });
 
 ipcMain.handle('window:toggleMaximize', (e) => {
   const win = BrowserWindow.fromWebContents(e.sender);
   if (!win) return false;
+  if (HEADLESS) return win.isMaximized();
   if (win.isMaximized()) win.unmaximize();
   else win.maximize();
   return win.isMaximized();
