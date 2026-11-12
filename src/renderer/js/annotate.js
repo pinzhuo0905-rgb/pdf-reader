@@ -908,16 +908,20 @@
   function openTextCreator(page, nx, ny) {
     const w = page.wPt * S().zoom;
     const h = page.hPt * S().zoom;
-    const rect = page.el.getBoundingClientRect();
+    const boxW = Math.max(60, Math.min(420, w * 0.55));
+    const sizePx = S().opts.fontSize * S().zoom;
     App.textedit.open({
-      left: rect.left + nx * w,
-      top: rect.top + ny * h,
-      width: Math.max(180, Math.min(420, w * 0.55)),
-      fontSize: S().opts.fontSize * S().zoom,
+      page,
+      x: nx * w,
+      y: ny * h,
+      w: boxW,
+      h: sizePx * 1.4,
+      fontSize: sizePx,
+      color: S().opts.textColor,
       initial: '',
+      multiline: true,
       onCommit: (text) => {
         if (!text.trim()) return;
-        const boxW = Math.max(60, Math.min(420, w * 0.55));
         const lines = text.split('\n');
         const estH = lines.length * S().opts.fontSize * 1.35 + 4;
         const annot = App.annots.add(page.id, {
@@ -935,7 +939,7 @@
         // 建好即选中：虚线框 + 手柄出现，可直接拖动/缩放
         S().selected = { pageId: page.id, annotId: annot.id };
         App.viewer.refreshOverlays();
-        App.ui.toast('已添加文本框：拖动移动，拖手柄缩放');
+        App.ui.toast(window.t('toast.textAdded'));
       },
     });
   }

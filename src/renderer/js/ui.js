@@ -3,9 +3,11 @@
   const App = (window.App = window.App || {});
   const S = () => App.state;
   const $ = (id) => document.getElementById(id);
+  const t = (k, v) => window.App.i18n.t(k, v);
 
   const ui = {
     searchTimer: 0,
+    zoomDragging: false,
   };
 
   /* ============================== 初始化 ============================== */
@@ -33,6 +35,28 @@
     $('btn-fit-width').onclick = () => App.viewer.fitWidth();
     $('btn-rotate').onclick = () => App.viewer.rotatePage(S().currentPage, 90);
     $('btn-viewmode').onclick = toggleTwoUp;
+
+    // 缩放滑块：拖动时实时缩放（平滑，按百分比）
+    const range = $('zoom-range');
+    if (range) {
+      const begin = () => {
+        ui.zoomDragging = true;
+      };
+      const end = () => {
+        ui.zoomDragging = false;
+      };
+      range.addEventListener('pointerdown', begin);
+      range.addEventListener('pointerup', end);
+      range.addEventListener('pointercancel', end);
+      range.addEventListener('blur', end);
+      range.addEventListener('input', () => {
+        ui.zoomDragging = true;
+        App.viewer.zoomTo(Number(range.value) / 100);
+      });
+      range.addEventListener('change', end);
+      range.addEventListener('keydown', (e) => e.stopPropagation());
+    }
+    updateZoom(1);
     $('page-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         const n = parseInt($('page-input').value, 10);
@@ -157,13 +181,13 @@
     const btn = $('win-max');
     if (!btn) return;
     btn.innerHTML = Icons.svg(max ? 'winRestore' : 'winMax');
-    btn.title = max ? '向下还原' : '最大化';
+    btn.title = t(max ? 'win.restore' : 'win.max');
   }
 
   /** 左上角汉堡：展开/收起「目录」侧栏 */
   function toggleSidebar() {
     if (!S().pdfDoc) {
-      toast('请先打开 PDF 文件');
+      toast(t('toast.openFirst'));
       return;
     }
     const open = App.viewer.toggleSidebar();
@@ -194,6 +218,7 @@
     $('editbar').classList.toggle('hidden', !st.editMode);
     $('btn-editpdf').classList.toggle('primary', !!st.editMode);
     $('btn-viewmode').classList.toggle('active', !!st.twoUp);
+    updateZoom(st.zoom || 1);
     $('hl-swatch').style.background = st.opts.highlightColor;
     renderToolProps();
     App.history.updateUndoButtons();
@@ -293,7 +318,7 @@
     if (on) {
       if (!EDIT_TOOLS.includes(state.tool)) setTool('textedit');
       else renderToolProps();
-      if (!silent) toast('编辑模式：点击文字可直接修改，或添加文本、图片、形状');
+      if (!silent) toast(t('toast.editModeOn'));
     } else {
       // 退出编辑模式：编辑类工具回到选择工具，标注类工具保持不变
       const keep = ['select', 'highlight', 'draw', 'eraser'];
@@ -361,24 +386,24 @@
 
     if (tool === 'textedit' || tool === 'textbox') {
       swatches(App.COLORS.text, 'textColor');
-      range('字号', 'fontSize', 8, 48, 1);
+      range(t('prop.fontSize'), 'fontSize', 8, 48, 1);
     } else if (tool === 'shape') {
       swatches(App.COLORS.shape, 'shapeColor');
-      range('线宽', 'shapeWidth', 1, 10, 0.5);
+      range(t('prop.lineWidth'), 'shapeWidth', 1, 10, 0.5);
     } else if (tool === 'highlight') {
       swatches(App.COLORS.highlight, 'highlightColor');
     } else if (tool === 'draw') {
       swatches(App.COLORS.pen, 'penColor');
-      range('粗细', 'penWidth', 1, 14, 0.5);
+      range(t('prop.width'), 'penWidth', 1, 14, 0.5);
     } else if (tool === 'whiteout') {
       const tip = document.createElement('span');
       tip.style.cssText = 'font-size:12px;color:var(--text-dim)';
-      tip.textContent = '拖动框选要遮盖的区域';
+      tip.textContent = t('prop.whiteoutTip');
       box.appendChild(tip);
     } else if (tool === 'select') {
       const tip = document.createElement('span');
       tip.style.cssText = 'font-size:12px;color:var(--text-dim)';
-      tip.textContent = '点击选中标注，拖动移动，Delete 删除';
+      tip.textContent = t('prop.selectTip');
       box.appendChild(tip);
     }
   }
@@ -434,7 +459,7 @@
   }
 
   function openHighlightMenu(anchor) {
-    const menu = showMenu(anchor, colorMenuHTML('高亮颜色', App.COLORS.highlight, S().opts.highlightColor));
+    const menu = showMenu(anchor, colorMenuHTML(t('menu.hlColor'), App.COLORS.highlight, S().opts.highlightColor));
     menu.querySelectorAll('.color-grid button').forEach((b) => {
       b.onclick = () => {
         S().opts.highlightColor = b.dataset.c;
@@ -450,8 +475,8 @@
     const o = S().opts;
     const menu = showMenu(
       anchor,
-      `${colorMenuHTML('画笔颜色', App.COLORS.pen, o.penColor)}
-       <div class="menu-title">粗细</div>
+      `${colorMenuHTML(t('menu.penColor'), App.COLORS.pen, o.penColor)}
+       <div class="menu-title">${t('menu.penWidth')}</div>
        <div style="display:flex;align-items:center;gap:8px;padding:0 12px 10px">
          <input id="pen-range" type="range" min="1" max="14" step="0.5" value="${o.penWidth}" style="flex:1;accent-color:var(--accent)"/>
          <span id="pen-val" style="font-size:12px;min-width:22px;text-align:right">${o.penWidth}</span>
@@ -483,13 +508,13 @@
     const o = S().opts;
     const menu = showMenu(
       anchor,
-      `<div class="menu-title">橡皮大小</div>
+      `<div class="menu-title">${t('menu.eraserSize')}</div>
        <div style="display:flex;align-items:center;gap:8px;padding:0 12px 8px">
          <input id="eraser-range" type="range" min="4" max="48" step="1" value="${o.eraserRadius}" style="flex:1;accent-color:var(--accent)"/>
          <span id="eraser-val" style="font-size:12px;min-width:38px;text-align:right">${o.eraserRadius}px</span>
        </div>
        <div style="padding:0 12px 10px;font-size:12px;color:var(--text-dim);line-height:1.5">
-         按住拖动，擦掉圆点下方的涂鸦
+         ${t('menu.eraserTip')}
        </div>`
     );
     const r = menu.querySelector('#eraser-range');
@@ -505,24 +530,24 @@
     const menu = showMenu(
       anchor,
       [
-        menuItemHTML('打开文件…', 'file', 'Ctrl+O'),
-        menuItemHTML('新建标签页', 'file', 'Ctrl+T'),
+        menuItemHTML(t('menu.open'), 'file', 'Ctrl+O'),
+        menuItemHTML(t('menu.newTab'), 'file', 'Ctrl+T'),
         '<div class="menu-sep"></div>',
-        menuItemHTML('插入图片', 'image'),
-        menuItemHTML('插入形状', 'shapes'),
-        menuItemHTML('涂改遮盖', 'whiteout'),
+        menuItemHTML(t('menu.image'), 'image'),
+        menuItemHTML(t('menu.shape'), 'shapes'),
+        menuItemHTML(t('menu.whiteout'), 'whiteout'),
         '<div class="menu-sep"></div>',
-        menuItemHTML('旋转页面', 'rotate'),
-        menuItemHTML('插入空白页', 'file'),
-        menuItemHTML('删除当前页', 'close'),
+        menuItemHTML(t('menu.rotate'), 'rotate'),
+        menuItemHTML(t('menu.insertPage'), 'file'),
+        menuItemHTML(t('menu.deletePage'), 'close'),
         '<div class="menu-sep"></div>',
-        menuItemHTML('文字识别 (OCR)', 'ocr'),
-        menuItemHTML('编辑 PDF 内容', 'editText'),
+        menuItemHTML(t('menu.ocr'), 'ocr'),
+        menuItemHTML(t('menu.editPdf'), 'editText'),
         '<div class="menu-sep"></div>',
-        menuItemHTML('文档属性', 'info'),
-        menuItemHTML('快捷键', 'menu'),
-        menuItemHTML('设为默认 PDF 阅读器', 'file'),
-        menuItemHTML('关于', 'info'),
+        menuItemHTML(t('menu.props'), 'info'),
+        menuItemHTML(t('menu.shortcuts'), 'menu'),
+        menuItemHTML(t('menu.defaultApp'), 'file'),
+        menuItemHTML(t('menu.about'), 'info'),
       ].join('')
     );
     bindMenuItems(menu, [
@@ -549,10 +574,10 @@
   function openShapeMenu(anchor) {
     const o = S().opts;
     const kinds = [
-      ['rect', '矩形'],
-      ['ellipse', '椭圆'],
-      ['line', '直线'],
-      ['arrow', '箭头'],
+      ['rect', t('menu.shapeRect')],
+      ['ellipse', t('menu.shapeEllipse')],
+      ['line', t('menu.shapeLine')],
+      ['arrow', t('menu.shapeArrow')],
     ];
     const menu = showMenu(
       anchor,
@@ -564,7 +589,7 @@
             }</div>`
         )
         .join('')}<div class="menu-sep"></div>
-        ${colorMenuHTML('线条颜色', App.COLORS.shape, o.shapeColor)}`
+        ${colorMenuHTML(t('menu.lineColor'), App.COLORS.shape, o.shapeColor)}`
     );
     menu.querySelectorAll('.menu-item[data-k]').forEach((el) => {
       el.onclick = () => {
@@ -583,30 +608,44 @@
 
   function openSettingsMenu(anchor) {
     const s = S().settings;
-    const themeLabel = { light: '浅色', dark: '深色', system: '跟随系统' };
+    const lang = App.i18n.lang;
+    const mark = (on) => `<span class="kbd">${on ? '✓' : ''}</span>`;
     const menu = showMenu(
       anchor,
       [
-        `<div class="menu-title">外观主题</div>`,
-        `<div class="menu-item" data-t="light"><span>浅色</span><span class="kbd">${s.theme === 'light' ? '✓' : ''}</span></div>`,
-        `<div class="menu-item" data-t="dark"><span>深色</span><span class="kbd">${s.theme === 'dark' ? '✓' : ''}</span></div>`,
-        `<div class="menu-item" data-t="system"><span>跟随系统</span><span class="kbd">${s.theme === 'system' ? '✓' : ''}</span></div>`,
+        `<div class="menu-title">${t('menu.theme')}</div>`,
+        `<div class="menu-item" data-t="light"><span>${t('menu.light')}</span>${mark(s.theme === 'light')}</div>`,
+        `<div class="menu-item" data-t="dark"><span>${t('menu.dark')}</span>${mark(s.theme === 'dark')}</div>`,
+        `<div class="menu-item" data-t="system"><span>${t('menu.system')}</span>${mark(s.theme === 'system')}</div>`,
         '<div class="menu-sep"></div>',
-        menuItemHTML('快捷键', 'menu'),
-        menuItemHTML('关于', 'info'),
+        `<div class="menu-title">${t('menu.lang')}</div>`,
+        `<div class="menu-item" data-l="zh"><span>${t('menu.langZh')}</span>${mark(lang === 'zh')}</div>`,
+        `<div class="menu-item" data-l="en"><span>${t('menu.langEn')}</span>${mark(lang === 'en')}</div>`,
+        '<div class="menu-sep"></div>',
+        menuItemHTML(t('menu.shortcuts'), 'menu'),
+        menuItemHTML(t('menu.about'), 'info'),
       ].join(''),
       { alignRight: true }
     );
     menu.querySelectorAll('.menu-item[data-t]').forEach((el) => {
       el.onclick = () => {
-        const t = el.dataset.t;
-        S().settings.theme = t;
-        window.api.setSettings({ theme: t });
-        applyTheme(t);
+        const th = el.dataset.t;
+        S().settings.theme = th;
+        window.api.setSettings({ theme: th });
+        applyTheme(th);
         closeMenus();
       };
     });
-    const items = menu.querySelectorAll('.menu-item:not([data-t])');
+    menu.querySelectorAll('.menu-item[data-l]').forEach((el) => {
+      el.onclick = () => {
+        const next = el.dataset.l;
+        S().settings.lang = next;
+        window.api.setSettings({ lang: next });
+        App.i18n.setLang(next);
+        closeMenus();
+      };
+    });
+    const items = menu.querySelectorAll('.menu-item:not([data-t]):not([data-l])');
     items[0].onclick = () => {
       closeMenus();
       showShortcuts();
@@ -615,6 +654,15 @@
       closeMenus();
       showAbout();
     };
+  }
+
+  /** 切换语言后重建所有带文案的动态 UI */
+  function refreshTexts() {
+    renderToolProps();
+    updateZoom(S().zoom);
+    $('btn-viewmode').classList.toggle('active', !!S().twoUp);
+    $('hl-swatch').style.background = S().opts.highlightColor;
+    if (S().pdfDoc) setTitle();
   }
 
   /* ============================== 主题 ============================== */
@@ -658,17 +706,17 @@
   async function save(as) {
     const st = S();
     if (!st.bytes) {
-      toast('请先打开一个 PDF 文件');
+      toast(t('toast.openPdfFirst'));
       return false;
     }
     // 用内容指纹判断：撤销回初始状态后按 Ctrl+S 也要能把文件改回去，
     // 所以不能再用「有没有标注」作为门槛
     const snap = App.history.snapshot();
     if (!as && st.savedFingerprint === snap) {
-      toast('没有需要保存的修改');
+      toast(t('toast.noChanges'));
       return true;
     }
-    App.viewer.showLoading('正在保存…');
+    App.viewer.showLoading(t('toast.saving'));
     try {
       const bytes = await App.exporter.build();
       let target = st.filePath;
@@ -693,12 +741,12 @@
       App.viewer.hideLoading();
       setTitle();
       App.history.updateUndoButtons();
-      toast('已保存：' + name);
+      toast(t('toast.saved', { name }));
       return true;
     } catch (e) {
       console.error(e);
       App.viewer.hideLoading();
-      toast('保存失败：' + e.message);
+      toast(t('toast.saveFailed', { msg: e.message }));
       return false;
     }
   }
@@ -707,7 +755,7 @@
   async function doPrint() {
     const st = S();
     if (!st.pdfDoc) return;
-    App.viewer.showLoading('正在准备打印…');
+    App.viewer.showLoading(t('toast.printPrepare'));
     try {
       const pages = [];
       const dpr = 2;
@@ -739,11 +787,11 @@
         pages,
         pageSize: { width: Math.round((first.wPt * 4) / 3), height: Math.round((first.hPt * 4) / 3) },
       });
-      if (!res.success && res.reason && res.reason !== 'cancelled') toast('打印未完成：' + res.reason);
+      if (!res.success && res.reason && res.reason !== 'cancelled') toast(t('toast.printIncomplete', { msg: res.reason }));
     } catch (e) {
       console.error(e);
       App.viewer.hideLoading();
-      toast('打印失败：' + e.message);
+      toast(t('toast.printFailed', { msg: e.message }));
     }
   }
 
@@ -782,12 +830,25 @@
   }
 
   /* ============================== 视图 ============================== */
+  /** 同步缩放滑块（拖动中不要抢用户的值） */
+  function updateZoom(zoom, preview) {
+    const r = $('zoom-range');
+    if (!r) return;
+    const pct = Math.max(15, Math.min(500, Math.round(zoom * 100)));
+    if (!ui.zoomDragging || preview) r.value = String(pct);
+    r.title = t('tb.zoomLevel') + ' ' + pct + '%';
+  }
+
   function toggleTwoUp() {
-    S().twoUp = !S().twoUp;
-    const pagesEl = App.viewer.getEl().pages;
-    if (pagesEl) pagesEl.classList.toggle('two-up', S().twoUp);
-    $('btn-viewmode').classList.toggle('active', S().twoUp);
-    App.viewer.onResize();
+    const st = S();
+    if (!st.pdfDoc) {
+      toast(t('toast.openFirst'));
+      return;
+    }
+    const on = App.viewer.setTwoUp(!st.twoUp);
+    $('btn-viewmode').classList.toggle('active', !!on);
+    updateZoom(S().zoom);
+    toast(t(on ? 'toast.twoUpOn' : 'toast.twoUpOff'));
   }
 
   async function toggleFullscreen() {
@@ -805,17 +866,17 @@
   function copySelection() {
     const text = selectedText();
     if (!text.trim()) {
-      toast('请先选中文本');
+      toast(t('toast.selectFirst'));
       return false;
     }
-    const done = () => toast(`已复制 ${text.length} 个字符`);
+    const done = () => toast(t('toast.copied', { n: text.length }));
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(done).catch(() => {
         try {
           document.execCommand('copy');
           done();
         } catch (e) {
-          toast('复制失败');
+          toast(t('toast.copyFailed'));
         }
       });
     } else {
@@ -823,7 +884,7 @@
         document.execCommand('copy');
         done();
       } catch (e) {
-        toast('复制失败');
+        toast(t('toast.copyFailed'));
       }
     }
     return true;
@@ -839,11 +900,11 @@
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
-    toast('已选中全部文本，按 Ctrl+C 复制');
+    toast(t('toast.selectAll'));
   }
 
   /* ============================== 弹窗 ============================== */
-  function showModal(title, bodyHTML, footButtons = [{ label: '关闭', primary: true }]) {
+  function showModal(title, bodyHTML, footButtons = [{ label: t('modal.close'), primary: true }]) {
     $('modal-title').textContent = title;
     $('modal-body').innerHTML = bodyHTML;
     const foot = $('modal-foot');
@@ -868,7 +929,7 @@
   async function showDocProps() {
     const st = S();
     if (!st.pdfDoc) {
-      toast('请先打开 PDF 文件');
+      toast(t('toast.openFirst'));
       return;
     }
     let meta = {};
@@ -881,53 +942,52 @@
     const size = st.bytes ? (st.bytes.length / 1024).toFixed(1) + ' KB' : '-';
     const fmt = (d) => (d ? new Date(d).toLocaleString() : '-');
     showModal(
-      '文档属性',
+      t('props.title'),
       `<table>
-        <tr><td>文件名</td><td>${escapeHtml(st.fileName || '-')}</td></tr>
-        <tr><td>页数</td><td>${st.pages.length}</td></tr>
-        <tr><td>文件大小</td><td>${size}</td></tr>
-        <tr><td>标题</td><td>${escapeHtml(meta.Title || '-')}</td></tr>
-        <tr><td>作者</td><td>${escapeHtml(meta.Author || '-')}</td></tr>
-        <tr><td>创建时间</td><td>${fmt(meta.CreationDate)}</td></tr>
-        <tr><td>修改时间</td><td>${fmt(meta.ModDate)}</td></tr>
+        <tr><td>${t('props.fileName')}</td><td>${escapeHtml(st.fileName || '-')}</td></tr>
+        <tr><td>${t('props.pages')}</td><td>${st.pages.length}</td></tr>
+        <tr><td>${t('props.size')}</td><td>${size}</td></tr>
+        <tr><td>${t('props.docTitle')}</td><td>${escapeHtml(meta.Title || '-')}</td></tr>
+        <tr><td>${t('props.author')}</td><td>${escapeHtml(meta.Author || '-')}</td></tr>
+        <tr><td>${t('props.created')}</td><td>${fmt(meta.CreationDate)}</td></tr>
+        <tr><td>${t('props.modified')}</td><td>${fmt(meta.ModDate)}</td></tr>
       </table>`
     );
   }
 
   function showShortcuts() {
     const rows = [
-      ['Ctrl + O', '打开文件'],
-      ['Ctrl + S', '保存'],
-      ['Ctrl + Shift + S', '另存为'],
-      ['Ctrl + P', '打印'],
-      ['Ctrl + F', '搜索'],
-      ['Ctrl + Z / Ctrl + Y', '撤销 / 重做'],
-      ['Ctrl + + / Ctrl + -', '放大 / 缩小'],
-      ['Ctrl + 0', '适应页面'],
-      ['PageUp / PageDown', '上一页 / 下一页'],
-      ['H / D / E / T', '高亮 / 绘制 / 橡皮 / 文本'],
-      ['Delete', '删除选中标注'],
-      ['Esc', '退出当前工具'],
+      ['Ctrl + O', t('sc.open')],
+      ['Ctrl + S', t('sc.save')],
+      ['Ctrl + Shift + S', t('sc.saveAs')],
+      ['Ctrl + P', t('sc.print')],
+      ['Ctrl + F', t('sc.search')],
+      ['Ctrl + Z / Ctrl + Y', t('sc.undoRedo')],
+      ['Ctrl + + / Ctrl + -', t('sc.zoom')],
+      ['Ctrl + 滚轮 / Ctrl + ↑↓', t('sc.zoomWheel')],
+      ['Ctrl + 0', t('sc.fitPage')],
+      ['PageUp / PageDown', t('sc.pageNav')],
+      ['H / D / E / T', t('sc.tools')],
+      ['Delete', t('sc.delete')],
+      ['Esc', t('sc.esc')],
     ];
     showModal(
-      '快捷键',
-      `<table>${rows.map(([k, v]) => `<tr><td style="width:150px">${k}</td><td>${v}</td></tr>`).join('')}</table>`
+      t('sc.title'),
+      `<table>${rows.map(([k, v]) => `<tr><td style="width:180px">${k}</td><td>${v}</td></tr>`).join('')}</table>`
     );
   }
 
   async function showAbout() {
     const v = await window.api.appVersion();
     showModal(
-      '关于',
+      t('about.title'),
       `<div style="display:flex;gap:14px;align-items:center;margin-bottom:10px">
         <img src="assets/pdf-icon-256.png" style="width:56px;height:56px"/>
         <div><div style="font-size:15px;font-weight:600">PDF Reader</div>
-        <div style="color:var(--text-dim);font-size:12px">版本 ${v.app}</div></div>
+        <div style="color:var(--text-dim);font-size:12px">${t('about.version')} ${v.app}</div></div>
       </div>
       <div style="color:var(--text-dim);font-size:12.5px;line-height:1.7">
-        界面与交互参照 Microsoft Edge 内置 PDF 阅读器设计，支持文本选择/复制、高亮、绘制、文本框，
-        并提供 PDF 内容编辑（文字修改、插入文本/图片/形状、涂改遮盖、页面管理）与
-        自研 OCR 文字识别（DB 文本检测 + CRNN/CTC 识别，纯 JS 实现，中英双语自动切换，可把扫描页转为可复制文本）。<br/>
+        ${t('about.desc')}<br/>
         Electron ${v.electron} · Chromium ${v.chrome}
       </div>`
     );
@@ -1007,6 +1067,11 @@
     } else if (ctrl && key === '-') {
       e.preventDefault();
       App.viewer.zoomOut();
+    } else if (ctrl && (key === 'ArrowUp' || key === 'ArrowDown')) {
+      // Ctrl + ↑/↓：平滑缩放（和 Ctrl + 滚轮一致）
+      e.preventDefault();
+      if (key === 'ArrowUp') App.viewer.zoomIn();
+      else App.viewer.zoomOut();
     } else if (ctrl && key.toLowerCase() === 'c') {
       if (selectedText().trim()) {
         e.preventDefault();
@@ -1035,7 +1100,7 @@
         if (a) {
           App.annots.remove(sel.pageId, sel.annotId);
           st.selected = null;
-          toast('已删除标注');
+          toast(t('toast.annotDeleted'));
         }
         e.preventDefault();
       }
@@ -1079,7 +1144,7 @@
       const file = e.dataTransfer.files && e.dataTransfer.files[0];
       if (!file) return;
       if (!/\.pdf$/i.test(file.name)) {
-        toast('仅支持 PDF 文件');
+        toast(t('toast.pdfOnly'));
         return;
       }
       const p = window.api.pathForFile(file);
@@ -1103,11 +1168,11 @@
     if (dirty.length === 1) {
       // 脏标签页不在前台时先切过去，否则「保存」会存错文档
       if (App.tabs.active() !== dirty[0]) App.tabs.activate(dirty[0].id);
-      showModal('保存更改？', '文档中有尚未保存的修改，是否在关闭前保存？', [
-        { label: '取消' },
-        { label: '不保存', onClick: () => window.api.allowClose() },
+      showModal(t('close.title'), t('close.desc'), [
+        { label: t('modal.cancel') },
+        { label: t('modal.dontSave'), onClick: () => window.api.allowClose() },
         {
-          label: '保存',
+          label: t('modal.save'),
           primary: true,
           onClick: async () => {
             const ok = await save(false);
@@ -1118,13 +1183,13 @@
       return;
     }
     showModal(
-      '有未保存的修改',
-      `共有 ${dirty.length} 个标签页存在尚未保存的修改：<br/><span style="color:var(--text-dim)">${dirty
-        .map((t) => escapeHtml(t.state.fileName || '新标签页'))
+      t('close.multiTitle'),
+      `${t('close.multiDesc', { n: dirty.length })}<br/><span style="color:var(--text-dim)">${dirty
+        .map((tb) => escapeHtml(tb.state.fileName || t('tab.untitled')))
         .join('、')}</span>`,
       [
-        { label: '取消' },
-        { label: '不保存并关闭', onClick: () => window.api.allowClose() },
+        { label: t('modal.cancel') },
+        { label: t('modal.dontSaveClose'), onClick: () => window.api.allowClose() },
       ]
     );
   }
@@ -1146,5 +1211,7 @@
     selectAllText,
     openPath,
     showModal,
+    updateZoom,
+    refreshTexts,
   };
 })();

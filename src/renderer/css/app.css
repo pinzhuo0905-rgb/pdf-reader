@@ -21,6 +21,15 @@ body {
   user-select: none;
 }
 
+/* 界面语言字体：中文宋体，英文 Times New Roman */
+body[data-lang='zh'] {
+  font-family: 'SimSun', '宋体', 'STSong', 'Songti SC', serif;
+}
+
+body[data-lang='en'] {
+  font-family: 'Times New Roman', Times, serif;
+}
+
 #app {
   --tb-bg: #f7f7f7;
   --tb-border: #d0d0d0;
@@ -519,6 +528,8 @@ body {
   flex-wrap: wrap;
   justify-content: center;
   align-content: flex-start;
+  column-gap: 10px;
+  row-gap: 18px;
 }
 
 .page {
@@ -1103,6 +1114,72 @@ body {
   justify-content: flex-end;
   gap: 8px;
   padding: 0 16px 16px;
+}
+
+/* ============================== 缩放滑块 ============================== */
+
+.zoom-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 88px;
+  height: 18px;
+  margin: 0 1px;
+  background: transparent;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.zoom-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--sep);
+}
+
+.zoom-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 0;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
+}
+
+.zoom-range:hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+.zoom-range:focus {
+  outline: none;
+}
+
+/* ========================== 页内文字编辑框 ========================== */
+
+.inline-editor {
+  position: absolute;
+  z-index: 20;
+  border: 1.5px dashed var(--accent);
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: 0 0 0 2px rgba(0, 114, 201, 0.1);
+  pointer-events: auto;
+}
+
+.inline-editor textarea {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0 1px;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.25;
+  font-family: inherit;
+  user-select: text;
+  caret-color: var(--accent);
 }
 
 /* ============================ 文字编辑浮层 ============================ */

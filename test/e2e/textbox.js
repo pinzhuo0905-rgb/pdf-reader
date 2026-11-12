@@ -63,8 +63,9 @@
     App.annotate.openTextCreator(page, 0.2, 0.3);
     await sleep(300);
     assert('editorDashed', getComputedStyle($('textEditor')).borderStyle === 'dashed', getComputedStyle($('textEditor')).borderStyle);
+    assert('editorInPage', $('textEditor').parentElement === page.el, $('textEditor').parentElement && $('textEditor').parentElement.className);
     $('textEditorInput').value = '这是一个可以拖动和缩放的文本框';
-    $('te-ok').click();
+    App.textedit.commit();
     await sleep(500);
 
     let a = App.annots.get(page.id).find((x) => x.type === 'text');
@@ -148,8 +149,10 @@
     /* 9) 点空白处仍能新建 */
     App.annotate.openTextCreator(page, 0.55, 0.7);
     await sleep(250);
-    assert('newOnEmpty', !$('textEditor').classList.contains('hidden'));
-    $('te-cancel').click();
+    assert('newOnEmpty', !!$('textEditor'));
+    App.textedit.cancel();
+    await sleep(120);
+    assert('editorClosed', !$('textEditor'));
 
     /* 10) 撤销能回退缩放/移动 */
     const beforeUndo = { w: a.w, x: a.x };

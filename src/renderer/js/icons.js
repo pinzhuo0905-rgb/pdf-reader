@@ -20,8 +20,9 @@
     eraser: `<g transform="rotate(-38 10 10)"><rect x="3.4" y="7.3" width="13.2" height="5.8" rx="1.7" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10 7.3v5.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></g>${P('M4.0 17.0h12.0')}`,
     textBox: `<rect x="2.7" y="4.3" width="14.6" height="11.4" rx="2.1" fill="none" stroke="currentColor" stroke-width="1.4"/>${P('M6.5 8.1h7M10 8.1v4.4')}`,
     more: `
-      <text x="0.9" y="14.7" font-size="11.4" font-family="'Segoe UI',sans-serif" fill="currentColor">a</text>
-      <text x="8.6" y="14.7" font-size="11.4" font-family="'Segoe UI',sans-serif" fill="currentColor">ö</text>`,
+      <circle cx="4.3" cy="10" r="1.45" fill="currentColor"/>
+      <circle cx="10" cy="10" r="1.45" fill="currentColor"/>
+      <circle cx="15.7" cy="10" r="1.45" fill="currentColor"/>`,
     minus: P('M4.2 10h11.6'),
     plus: `${P('M4.2 10h11.6')}${P('M10 4.2v11.6')}`,
     fitWidth: `<rect x="2.6" y="5.7" width="14.8" height="8.6" rx="1.7" fill="none" stroke="currentColor" stroke-width="1.4"/>${P('M6.5 10h7M8.3 8.2 6.5 10l1.8 1.8M11.7 8.2 13.5 10l-1.8 1.8')}`,

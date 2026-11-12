@@ -59,9 +59,11 @@
     App.ui.setTool('textbox');
     ev('pointerdown', rect.left + W * 0.22, rect.top + H * 0.72);
     await sleep(200);
-    log.editorOpened = !document.getElementById('textEditor').classList.contains('hidden');
+    // 编辑框现在直接贴在页面里（原地编辑），不再是一个浮动弹窗
+    const te = document.getElementById('textEditor');
+    log.editorOpened = !!te && te.parentElement === page.el;
     document.getElementById('textEditorInput').value = 'E2E 测试文本';
-    document.getElementById('te-ok').click();
+    App.textedit.commit();
     await sleep(200);
     log.text = App.annots.get(page.id).filter((a) => a.type === 'text').length;
 

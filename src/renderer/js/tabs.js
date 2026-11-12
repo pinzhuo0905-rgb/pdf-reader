@@ -2,6 +2,8 @@
 (function () {
   const App = (window.App = window.App || {});
   const $ = (id) => document.getElementById(id);
+  // 注意：本文件里 t 常被用作标签页变量，i18n 统一走 tr()
+  const tr = (k, v) => window.App.i18n.t(k, v);
 
   const tabs = {
     list: [],
@@ -13,7 +15,7 @@
   let windowCount = 1; // 当前应用开了几个窗口（单标签时用来区分「移动窗口」和「合并」）
   let pendingActivate = null;
 
-  const label = (t) => (t.state && t.state.fileName) || '新标签页';
+  const label = (t) => (t.state && t.state.fileName) || tr('tab.untitled');
 
   /* ============================== 初始化 ============================== */
 
@@ -156,7 +158,7 @@
       return true;
     } catch (e) {
       console.error(e);
-      App.ui.toast('打开失败：' + (e.message || e));
+      App.ui.toast(tr('toast.openFailed', { msg: e.message || e }));
       close(t.id, true);
       return false;
     }
@@ -227,7 +229,7 @@
       close(t.id, true);
     }
     activate(id);
-    if (skipped.length) App.ui.toast('已保留有未保存修改的标签页：' + skipped.join('、'));
+    if (skipped.length) App.ui.toast(tr('toast.keptDirty', { list: skipped.join('、') }));
   }
 
   function closeRight(id) {
@@ -241,7 +243,7 @@
       }
       close(t.id, true);
     }
-    if (skipped.length) App.ui.toast('已保留有未保存修改的标签页：' + skipped.join('、'));
+    if (skipped.length) App.ui.toast(tr('toast.keptDirty', { list: skipped.join('、') }));
   }
 
   /* ============================== 渲染 ============================== */
@@ -256,7 +258,7 @@
       el.dataset.id = t.id;
       if (t.id === tabs.activeId) el.classList.add('active');
       if (t.state.dirty) el.classList.add('dirty');
-      el.title = t.state.filePath || '新标签页';
+      el.title = t.state.filePath || tr('tab.untitled');
 
       const ico = document.createElement('img');
       ico.className = 'tab-ico';
@@ -270,7 +272,7 @@
 
       const btn = document.createElement('button');
       btn.className = 'tab-close';
-      btn.title = '关闭标签页 (Ctrl+W)';
+      btn.title = tr('tab.close');
       btn.innerHTML = Icons.svg('close');
 
       el.appendChild(ico);
@@ -353,6 +355,12 @@
     document.title = t.state.fileName
       ? `${t.state.fileName}${t.state.dirty ? ' *' : ''} - PDF Reader`
       : 'PDF Reader';
+  }
+
+  /** 切换界面语言后重建标签条文案（标签标题 / 关闭按钮提示） */
+  function refreshTexts() {
+    render();
+    if (tabs.activeId) refreshActive();
   }
 
   /* ============================== 拖拽 ============================== */
@@ -494,12 +502,12 @@
   async function detach(t, force) {
     const st = t.state;
     if (!st.filePath) {
-      App.ui.toast('该标签页还没有对应的文件，无法拖出');
+      App.ui.toast(tr('toast.noFileToDetach'));
       paintStrip();
       return { skipped: true };
     }
     if (st.dirty) {
-      App.ui.toast('请先保存该标签页，再拖出');
+      App.ui.toast(tr('toast.saveBeforeDetach'));
       paintStrip();
       return { skipped: true };
     }
@@ -509,12 +517,12 @@
     try {
       res = await window.api.detachTab({ path: st.filePath, page: st.currentPage + 1, only });
     } catch (e) {
-      App.ui.toast('移动失败：' + (e.message || e));
+      App.ui.toast(tr('toast.detachFailed', { msg: e.message || e }));
       paintStrip();
       return { skipped: true };
     }
     if (res && res.skipped) {
-      App.ui.toast('松手位置没有其他窗口');
+      App.ui.toast(tr('toast.noTargetWindow'));
       paintStrip();
       return res;
     }
@@ -524,7 +532,7 @@
       window.api.allowClose();
       return res;
     }
-    App.ui.toast(res && res.merged ? '已移动到另一个窗口' : '已在新窗口中打开');
+    App.ui.toast(tr(res && res.merged ? 'toast.movedToWindow' : 'toast.openedInWindow'));
     return res;
   }
 
@@ -537,16 +545,16 @@
     const t = find(tabEl.dataset.id);
     if (!t) return;
     const items = [
-      { label: '关闭标签页', icon: 'close', onClick: () => close(t.id) },
-      { label: '关闭其他标签页', icon: 'close', onClick: () => closeOthers(t.id) },
-      { label: '关闭右侧标签页', icon: 'close', onClick: () => closeRight(t.id) },
+      { label: tr('tab.ctxClose'), icon: 'close', onClick: () => close(t.id) },
+      { label: tr('tab.ctxCloseOthers'), icon: 'close', onClick: () => closeOthers(t.id) },
+      { label: tr('tab.ctxCloseRight'), icon: 'close', onClick: () => closeRight(t.id) },
     ];
     if (t.state.filePath) {
       items.push(
-        { label: '复制文件路径', icon: 'file', onClick: () => copyPath(t.state.filePath) },
-        { label: '在文件夹中显示', icon: 'file', onClick: () => window.api.showItemInFolder(t.state.filePath) },
+        { label: tr('tab.ctxCopyPath'), icon: 'file', onClick: () => copyPath(t.state.filePath) },
+        { label: tr('tab.ctxShowInFolder'), icon: 'file', onClick: () => window.api.showItemInFolder(t.state.filePath) },
         {
-          label: '在新窗口中打开',
+          label: tr('tab.ctxOpenWindow'),
           icon: 'expand',
           onClick: () => detach(t, true),
         }
@@ -558,8 +566,8 @@
   function copyPath(p) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(p).then(
-        () => App.ui.toast('已复制路径'),
-        () => App.ui.toast('复制失败')
+        () => App.ui.toast(tr('toast.pathCopied')),
+        () => App.ui.toast(tr('toast.copyFailed'))
       );
     }
   }
@@ -588,6 +596,7 @@
     openBytes,
     close,
     refreshActive,
+    refreshTexts,
     detach,
   };
 })();

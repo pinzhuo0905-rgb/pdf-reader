@@ -83,6 +83,7 @@ function settingsFile() {
 
 const DEFAULT_SETTINGS = {
   theme: 'light', // light | dark | system
+  lang: 'zh', // zh | en（界面语言）
   lastDir: '',
 };
 

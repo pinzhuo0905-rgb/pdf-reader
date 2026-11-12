@@ -2,6 +2,7 @@
 (function () {
   const App = (window.App = window.App || {});
   const S = () => App.state;
+  const tr = (k, v) => window.App.i18n.t(k, v);
 
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
 
@@ -17,8 +18,12 @@
   };
   /** 滚动时额外要通知的钩子（文字编辑浮层用来取消编辑） */
   const scrollHooks = [];
+  /** 缩放前后要通知的钩子（内联编辑器需要先落笔） */
+  const zoomHooks = [];
 
   const PAD_X = 24;
+  /** 双页视图两页之间的横向间距 */
+  const TWO_UP_GAP = 10;
 
   /* ------------------------------- 初始化 ------------------------------- */
   function init() {
@@ -83,6 +88,7 @@
     tab.dom = { view, scroll, pages };
 
     scroll.addEventListener('scroll', onScroll, { passive: true });
+    scroll.addEventListener('wheel', onWheel, { passive: false });
     // 每个视图一个观察器，root 必须是它自己的滚动容器
     tab.observer = new IntersectionObserver(
       (entries) => {
@@ -118,6 +124,21 @@
     scrollHooks.push(fn);
   }
 
+  /** 注册「缩放即将变化」回调（内联编辑需要先提交，否则会跟着缩放错位） */
+  function onZoomHook(fn) {
+    zoomHooks.push(fn);
+  }
+
+  function runZoomHooks() {
+    for (const fn of zoomHooks) {
+      try {
+        fn();
+      } catch (e) {
+        /* 钩子异常不影响缩放 */
+      }
+    }
+  }
+
   /* -------------------------------- 加载 -------------------------------- */
   let loadingCount = 0;
 
@@ -137,7 +158,7 @@
   }
 
   async function doLoad(bytes, filePath, fileName, opts = {}) {
-    showLoading('正在打开…');
+    showLoading(tr('loading.opening'));
     const state = S();
     state.bytes = bytes;
     state.filePath = filePath;
@@ -161,7 +182,7 @@
       state.pdfDoc = await task.promise;
     } catch (err) {
       hideLoading();
-      App.ui.toast('无法打开该 PDF：' + (err && err.message ? err.message : err));
+      App.ui.toast(tr('toast.openFailed', { msg: (err && err.message) || err }));
       console.error(err);
       return false;
     }
@@ -240,11 +261,17 @@
   }
 
   /* ------------------------------ 缩放计算 ------------------------------ */
+  /** 双页视图下每页可用的宽度只有单页的一半 */
+  function availWidth() {
+    const w = el.scroll.clientWidth - PAD_X * 2 - 18;
+    return S().twoUp ? Math.max(120, (w - TWO_UP_GAP) / 2) : w;
+  }
+
   function computeAutoZoom() {
     const state = S();
     const first = state.pages[0];
     if (!first) return;
-    const availW = el.scroll.clientWidth - PAD_X * 2 - 18;
+    const availW = availWidth();
     const availH = el.scroll.clientHeight - 40;
     let z;
     if (state.zoomMode === 'fitPage') {
@@ -259,32 +286,162 @@
     state.zoom = Math.max(0.15, Math.min(4, z));
   }
 
+  const clampZoom = (z) => Math.max(0.15, Math.min(5, z));
+
   function setZoom(z, mode) {
     const state = S();
-    state.zoom = Math.max(0.15, Math.min(5, z));
+    runZoomHooks();
+    state.zoom = clampZoom(z);
     if (mode) state.zoomMode = mode;
     const anchor = captureAnchor();
     layout();
     restoreAnchor(anchor);
+    notifyZoom();
+  }
+
+  function notifyZoom() {
+    if (App.ui && App.ui.updateZoom) App.ui.updateZoom(S().zoom);
   }
 
   function zoomIn() {
-    const s = S();
-    setZoom(s.zoom * 1.15, 'custom');
+    animateZoom(S().zoom * 1.15, centerAnchor(), 'custom');
   }
   function zoomOut() {
-    const s = S();
-    setZoom(s.zoom / 1.15, 'custom');
+    animateZoom(S().zoom / 1.15, centerAnchor(), 'custom');
   }
   function fitWidth() {
     S().zoomMode = 'fitWidth';
     computeAutoZoom();
-    setZoom(S().zoom, 'fitWidth');
+    animateZoom(S().zoom, centerAnchor(), 'fitWidth', 0);
   }
   function fitPage() {
     S().zoomMode = 'fitPage';
     computeAutoZoom();
-    setZoom(S().zoom, 'fitPage');
+    animateZoom(S().zoom, centerAnchor(), 'fitPage', 0);
+  }
+
+  /** 视口中心的锚点（屏幕坐标），用于键盘/按钮缩放 */
+  function centerAnchor() {
+    const r = el.scroll.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+
+  /**
+   * 平滑缩放：先在 .pages 上做 CSS transform 预览（逐帧插值，不触发重绘），
+   * 动画结束后再真正改布局。anchor 为屏幕坐标，缩放时该点下的内容保持不动。
+   */
+  let zoomAnim = null;
+
+  function animateZoom(target, anchor, mode, duration) {
+    const st = S();
+    const to = clampZoom(target);
+    if (!el.pages) {
+      setZoom(to, mode);
+      return;
+    }
+    if (!zoomAnim) {
+      zoomAnim = { cur: st.zoom, target: st.zoom, raf: 0, anchor: null, mode: null, from: st.zoom, t0: 0 };
+    }
+    zoomAnim.anchor = anchor || zoomAnim.anchor || centerAnchor();
+    zoomAnim.mode = mode || zoomAnim.mode;
+    zoomAnim.target = to;
+    if (duration === 0) {
+      zoomAnim.cur = to;
+      finishZoomAnim();
+      return;
+    }
+    if (!zoomAnim.raf) {
+      zoomAnim.cur = zoomAnim.cur || st.zoom;
+      zoomAnim.raf = requestAnimationFrame(zoomStep);
+    }
+    // 中途改目标：从当前值重新起算，避免曲线跳变
+    zoomAnim.from = zoomAnim.cur;
+    zoomAnim.t0 = performance.now();
+    // 兜底：窗口不可见时 rAF 会被节流甚至不触发，定时器保证最终一定落位
+    clearTimeout(zoomAnim.timer);
+    const anim = zoomAnim;
+    zoomAnim.timer = setTimeout(() => {
+      if (zoomAnim === anim) finishZoomAnim();
+    }, 260);
+  }
+
+  function zoomStep(now) {
+    const a = zoomAnim;
+    if (!a) return;
+    const dur = 150;
+    const k = Math.min(1, (now - a.t0) / dur);
+    // easeOutCubic
+    const e = 1 - Math.pow(1 - k, 3);
+    a.cur = a.from + (a.target - a.from) * e;
+    const ratio = a.cur / S().zoom;
+    const rect = el.pages.getBoundingClientRect();
+    const ox = Math.max(0, Math.min(rect.width, a.anchor.x - rect.left));
+    const oy = Math.max(0, Math.min(rect.height, a.anchor.y - rect.top));
+    el.pages.style.transformOrigin = ox + 'px ' + oy + 'px';
+    el.pages.style.transform = 'scale(' + ratio.toFixed(4) + ')';
+    notifyZoomPreview(a.cur);
+    if (k >= 1) {
+      a.raf = 0;
+      finishZoomAnim();
+      return;
+    }
+    a.raf = requestAnimationFrame(zoomStep);
+  }
+
+  function notifyZoomPreview(z) {
+    if (App.ui && App.ui.updateZoom) App.ui.updateZoom(z, true);
+  }
+
+  function finishZoomAnim() {
+    const a = zoomAnim;
+    zoomAnim = null;
+    if (!a) return;
+    clearTimeout(a.timer);
+    if (el.pages) {
+      el.pages.style.transform = '';
+      el.pages.style.transformOrigin = '';
+    }
+    // 让锚点下的内容保持不动：换算成滚动位置
+    const anchor = a.anchor;
+    const oldZoom = S().zoom;
+    const nextZoom = clampZoom(a.target);
+    const ratio = nextZoom / (oldZoom || 1);
+    const pageTop = el.pages.offsetTop;
+    const pageLeft = el.pages.offsetLeft;
+    const rect = el.pages.getBoundingClientRect();
+    const ox = Math.max(0, Math.min(rect.width, (anchor ? anchor.x : rect.left + rect.width / 2) - rect.left));
+    const oy = Math.max(0, Math.min(rect.height, (anchor ? anchor.y : rect.top + rect.height / 2) - rect.top));
+    setZoom(nextZoom, a.mode);
+    if (anchor && el.scroll) {
+      const area = el.scroll.getBoundingClientRect();
+      el.scroll.scrollLeft = pageLeft + ox * ratio - (anchor.x - area.left);
+      el.scroll.scrollTop = pageTop + oy * ratio - (anchor.y - area.top);
+    }
+  }
+
+  /** 滚轮缩放：以鼠标位置为锚点 */
+  function zoomAt(clientX, clientY, factor) {
+    const st = S();
+    const base = zoomAnim ? zoomAnim.target : st.zoom;
+    animateZoom(base * factor, { x: clientX, y: clientY }, 'custom');
+  }
+
+  /** Ctrl + 滚轮：平滑缩放，鼠标下的内容保持不动 */
+  function onWheel(e) {
+    if (!e.ctrlKey && !e.metaKey) return;
+    if (!S().pdfDoc || !el.scroll) return;
+    // 只处理当前激活标签页的滚动区
+    if (el.scroll !== e.currentTarget) return;
+    e.preventDefault();
+    const raw = Math.pow(1.0018, -e.deltaY);
+    const factor = Math.max(0.75, Math.min(1.34, raw));
+    zoomAt(e.clientX, e.clientY, factor);
+  }
+
+  /** 滑块直接指定缩放百分比 */
+  function zoomTo(z, anchor) {
+    S().zoomMode = 'custom';
+    animateZoom(z, anchor || centerAnchor(), 'custom');
   }
 
   /* ------------------------------ DOM 构建 ------------------------------ */
@@ -334,10 +491,34 @@
         p._layoutZoom = z;
         sizeOverlay(p);
         p.rendered = false;
+        // 文本层坐标是按当前缩放算的，缩放一变必须作废，否则点选会命中错的行
+        p.textItems = null;
         resized = true;
       }
     }
+    applySpreadWidth(z);
     renderVisible(resized);
+  }
+
+  /**
+   * 双页视图：给 .pages 一个「刚好两页」的宽度，flex-wrap 就会每行排两页。
+   * （.pages 默认 width:fit-content，不给宽度的话它会把所有页排成一行，看起来和单页没区别）
+   */
+  function applySpreadWidth(z) {
+    if (!el.pages) return;
+    const st = S();
+    el.pages.classList.toggle('two-up', !!st.twoUp);
+    if (!st.twoUp) {
+      el.pages.style.width = '';
+      return;
+    }
+    let maxW = 0;
+    for (const p of st.pages) maxW = Math.max(maxW, p.wPt * z);
+    if (!maxW) {
+      el.pages.style.width = '';
+      return;
+    }
+    el.pages.style.width = Math.round(maxW * 2 + TWO_UP_GAP + PAD_X * 2) + 'px';
   }
 
   function sizeOverlay(p) {
@@ -661,6 +842,7 @@
     }
     st._viewWidth = w;
     updatePageIndicator();
+    notifyZoom();
   }
 
   function onResize() {
@@ -694,13 +876,13 @@
     App.history.push();
     renderPage(p.id);
     renderThumbIfOpen(p);
-    App.ui.toast(`第 ${index + 1} 页已旋转`);
+    App.ui.toast(tr('toast.pageRotated', { n: index + 1 }));
   }
 
   function deletePage(index) {
     const state = S();
     if (state.pages.length <= 1) {
-      App.ui.toast('至少需要保留一页');
+      App.ui.toast(tr('toast.keepOnePage'));
       return;
     }
     const p = state.pages[index];
@@ -714,7 +896,7 @@
     App.history.push();
     updatePageIndicator();
     buildThumbs();
-    App.ui.toast(`已删除第 ${index + 1} 页`);
+    App.ui.toast(tr('toast.pageDeleted', { n: index + 1 }));
   }
 
   function insertBlankPage(index) {
@@ -751,7 +933,7 @@
     App.history.push();
     updatePageIndicator();
     buildThumbs();
-    App.ui.toast('已插入空白页');
+    App.ui.toast(tr('toast.blankInserted'));
   }
 
   function setPageModel(model) {
@@ -1044,12 +1226,29 @@
     return el;
   }
 
+  /** 切换单页 / 双页视图（真正改变排版，不只是加个 class） */
+  function setTwoUp(on) {
+    const st = S();
+    if (!st.pdfDoc) return false;
+    st.twoUp = !!on;
+    runZoomHooks();
+    const a = captureAnchor();
+    if (st.zoomMode === 'fitWidth' || st.zoomMode === 'fitPage' || st.zoomMode === 'auto') {
+      computeAutoZoom();
+    }
+    layout();
+    restoreAnchor(a);
+    notifyZoom();
+    return st.twoUp;
+  }
+
   App.viewer = {
     init,
     createView,
     bindTab,
     destroyView,
     onScrollHook,
+    onZoomHook,
     resumeView,
     isSidebarOpen,
     buildOutline,
@@ -1059,6 +1258,11 @@
     setZoom,
     zoomIn,
     zoomOut,
+    zoomTo,
+    zoomAt,
+    animateZoom,
+    setTwoUp,
+    notifyZoom,
     fitWidth,
     fitPage,
     renderVisible,

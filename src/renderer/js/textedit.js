@@ -1,20 +1,92 @@
-/* 文字编辑：新增文本、修改已有文字（覆盖重写） */
+/* 文字编辑：新增文本、修改已有文字（覆盖重写）
+ *
+ * 交互要点：编辑框直接贴在页面上（和 PDF 内容同一坐标系），
+ * 看起来就是「在 PDF 里原地改字」，不再弹出一个带确定/取消的浮层。
+ * 回车 / 点击别处 = 提交，Esc = 取消。
+ */
 (function () {
   const App = (window.App = window.App || {});
   const S = () => App.state;
 
-  const el = {};
-  let ctx = null; // {onCommit,onCancel}
+  let active = null; // {page, box, input, onCommit, onCancel, closed}
 
   function init() {
-    el.box = document.getElementById('textEditor');
-    el.input = document.getElementById('textEditorInput');
-    el.ok = document.getElementById('te-ok');
-    el.cancel = document.getElementById('te-cancel');
+    // 滚动 / 缩放前先落笔，避免编辑框和页面内容错位
+    App.viewer.onScrollHook(() => commitIfOpen());
+    App.viewer.onZoomHook(() => commitIfOpen());
+    // 切换标签页时提交
+    document.addEventListener('pointerdown', (e) => {
+      if (!active) return;
+      if (active.box.contains(e.target)) return;
+      // 点在别处：先把正在编辑的内容落笔
+      commitIfOpen();
+    }, true);
+  }
 
-    el.ok.addEventListener('click', commit);
-    el.cancel.addEventListener('click', cancel);
-    el.input.addEventListener('keydown', (e) => {
+  function isOpen() {
+    return !!active;
+  }
+
+  /**
+   * @param {object} o
+   *  page       页面对象（page.el 作为定位父元素）
+   *  x,y,w,h    相对页面左上角的像素坐标/尺寸（当前缩放下的屏幕 px）
+   *  fontSize   字号（屏幕 px）
+   *  color/bg   文字色 / 底色
+   *  initial    初始文本
+   *  multiline  是否允许换行（Shift+Enter）
+   */
+  function open(o) {
+    close(true);
+    const page = o.page;
+    if (!page || !page.el) return;
+
+    const box = document.createElement('div');
+    box.id = 'textEditor';
+    box.className = 'inline-editor';
+
+    const input = document.createElement('textarea');
+    input.id = 'textEditorInput';
+    input.spellcheck = false;
+    input.value = o.initial || '';
+
+    const fs = Math.max(9, o.fontSize || 14);
+    const w = Math.max(40, o.w || 180);
+    const h = Math.max(fs * 1.3, o.h || fs * 1.4);
+
+    box.style.left = Math.round(o.x) + 'px';
+    box.style.top = Math.round(o.y) + 'px';
+    box.style.width = Math.round(w) + 'px';
+    input.style.fontSize = fs.toFixed(2) + 'px';
+    input.style.lineHeight = '1.25';
+    // 与写回 PDF 时用的字体保持一致，编辑时看到的就是最终效果
+    input.style.fontFamily = (App.annotate && App.annotate.FONT_STACK) || 'inherit';
+    input.style.color = o.color || 'var(--text)';
+    input.style.background = o.bg || 'transparent';
+    input.style.height = Math.round(h) + 'px';
+    if (o.align) input.style.textAlign = o.align;
+
+    box.appendChild(input);
+    page.el.appendChild(box);
+
+    active = {
+      page,
+      box,
+      input,
+      onCommit: o.onCommit,
+      onCancel: o.onCancel,
+      multiline: !!o.multiline,
+    };
+
+    // 阻止事件冒泡到标注层（否则点编辑框会被当成「再建一个文本框」）
+    const stop = (e) => e.stopPropagation();
+    box.addEventListener('pointerdown', stop);
+    box.addEventListener('mousedown', stop);
+    box.addEventListener('dblclick', stop);
+
+    input.addEventListener('input', autosize);
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
       if (e.key === 'Escape') {
         e.preventDefault();
         cancel();
@@ -23,41 +95,61 @@
         commit();
       }
     });
-    // 任一标签页滚动时收起编辑浮层
-    App.viewer.onScrollHook(() => {
-      if (!el.box.classList.contains('hidden')) cancel();
+    input.addEventListener('blur', () => {
+      // 失焦即落笔（关闭时已在内部置 closed，不会重复触发）
+      setTimeout(() => {
+        if (active && active.input === input) commit();
+      }, 0);
     });
-  }
 
-  function open(opts) {
-    ctx = opts;
-    el.box.classList.remove('hidden');
-    el.box.style.left = Math.max(8, Math.min(window.innerWidth - 320, opts.left)) + 'px';
-    el.box.style.top = Math.max(56, Math.min(window.innerHeight - 140, opts.top)) + 'px';
-    el.input.style.width = Math.max(200, opts.width || 240) + 'px';
-    el.input.style.fontSize = Math.max(12, opts.fontSize || 14) + 'px';
-    el.input.value = opts.initial || '';
     setTimeout(() => {
-      el.input.focus();
-      el.input.select();
+      input.focus();
+      // 光标放到末尾，方便直接在原文后面继续改
+      const n = input.value.length;
+      input.setSelectionRange(n, n);
+      autosize();
     }, 0);
   }
 
+  function autosize() {
+    if (!active) return;
+    const t = active.input;
+    t.style.height = 'auto';
+    t.style.height = Math.max(parseFloat(t.style.fontSize) * 1.3, t.scrollHeight) + 'px';
+  }
+
+  function teardown() {
+    if (!active) return null;
+    const a = active;
+    active = null;
+    if (a.box.parentNode) a.box.parentNode.removeChild(a.box);
+    return a;
+  }
+
   function commit() {
-    if (!ctx) return;
-    const text = el.input.value;
-    const cb = ctx.onCommit;
-    ctx = null;
-    el.box.classList.add('hidden');
-    if (cb) cb(text);
+    const a = teardown();
+    if (!a) return;
+    const text = a.input.value;
+    if (a.onCommit) a.onCommit(text);
+  }
+
+  function commitIfOpen() {
+    if (active) commit();
   }
 
   function cancel() {
-    if (!ctx) return;
-    const cb = ctx.onCancel;
-    ctx = null;
-    el.box.classList.add('hidden');
-    if (cb) cb();
+    const a = teardown();
+    if (!a) return;
+    if (a.onCancel) a.onCancel();
+  }
+
+  function close(silent) {
+    if (!active) return;
+    if (silent) {
+      teardown();
+    } else {
+      cancel();
+    }
   }
 
   /* --------------------------- 采样页面像素颜色 --------------------------- */
@@ -112,7 +204,7 @@
 
   /* ---------------------------- 命中已有文字 ---------------------------- */
   function itemAt(page, nx, ny) {
-    const items = App.viewer.getTextItems(page.id);
+    const items = page.textItems || App.viewer.getTextItems(page.id);
     const W = page.wPt * S().zoom;
     const H = page.hPt * S().zoom;
     const x = nx * W;
@@ -132,7 +224,15 @@
   }
 
   /** 编辑工具点击：命中文字则覆盖重写，否则新建文本框 */
-  function startAt(page, nx, ny) {
+  async function startAt(page, nx, ny) {
+    // 文本层坐标可能因为缩放/重绘被作废，先确保按当前缩放算好
+    if (!page.textItems && page.src != null) {
+      try {
+        await App.viewer.ensureTextItems(page);
+      } catch {
+        /* 没有文本层时按新建文本框处理 */
+      }
+    }
     const it = itemAt(page, nx, ny);
     if (!it) {
       App.annotate.openTextCreator(page, nx, ny);
@@ -144,7 +244,6 @@
   function editItem(page, it) {
     const W = page.wPt * S().zoom;
     const H = page.hPt * S().zoom;
-    const rect = page.el.getBoundingClientRect();
     const sizePx = it.fontSize;
     // 覆盖框略作外扩，确保原文字（含上下伸部）被完全遮盖
     const padY = it.height * 0.1;
@@ -155,10 +254,14 @@
     const sample = sampleRegion(page, nx, ny, nw, nh);
 
     open({
-      left: rect.left + it.left,
-      top: rect.top + it.top,
-      width: Math.max(160, it.width + 60),
+      page,
+      x: it.left,
+      y: it.top - padY,
+      w: Math.max(60, it.width + 8),
+      h: it.height + padY * 2,
       fontSize: sizePx,
+      color: sample.fg,
+      bg: sample.bg,
       initial: it.str,
       onCommit: (text) => {
         if (!text.trim() || text === it.str) return;
@@ -182,7 +285,7 @@
           align: 'left',
           cover: true,
         });
-        App.ui.toast('已修改文字，保存后写入 PDF');
+        App.ui.toast(window.t('toast.textEdited'));
       },
     });
   }
@@ -191,13 +294,17 @@
   function editExisting(page, a) {
     const W = page.wPt * S().zoom;
     const H = page.hPt * S().zoom;
-    const rect = page.el.getBoundingClientRect();
     open({
-      left: rect.left + a.x * W,
-      top: rect.top + a.y * H,
-      width: Math.max(200, a.w * W),
-      fontSize: Math.max(11, a.size * S().zoom),
+      page,
+      x: a.x * W,
+      y: a.y * H,
+      w: Math.max(60, a.w * W),
+      h: Math.max(14, a.h * H),
+      fontSize: Math.max(9, a.size * S().zoom),
+      color: a.color || '#1b1b1b',
+      bg: a.bg || 'transparent',
       initial: a.text,
+      multiline: true,
       onCommit: (text) => {
         if (!text.trim()) {
           App.annots.remove(page.id, a.id);
@@ -216,5 +323,17 @@
     });
   }
 
-  App.textedit = { init, open, startAt, editExisting, itemAt, sampleRegion };
+  App.textedit = {
+    init,
+    open,
+    close,
+    commit,
+    commitIfOpen,
+    cancel,
+    isOpen,
+    startAt,
+    editExisting,
+    itemAt,
+    sampleRegion,
+  };
 })();

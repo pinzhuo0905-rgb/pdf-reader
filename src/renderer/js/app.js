@@ -9,6 +9,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const s = await window.api.getSettings();
     Object.assign(App.settings, s || {});
     App.ui.applyTheme((s && s.theme) || 'light');
+    App.i18n.setLang((s && s.lang) || 'zh', { silent: true });
   } catch (e) {
     /* 使用默认设置 */
   }
