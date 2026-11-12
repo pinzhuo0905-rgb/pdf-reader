@@ -1117,7 +1117,9 @@
       window.api.allowClose();
       return;
     }
-    if (dirty.length === 1 && App.tabs.active() === dirty[0]) {
+    if (dirty.length === 1) {
+      // 脏标签页不在前台时先切过去，否则「保存」会存错文档
+      if (App.tabs.active() !== dirty[0]) App.tabs.activate(dirty[0].id);
       showModal('保存更改？', '文档中有尚未保存的修改，是否在关闭前保存？', [
         { label: '取消' },
         { label: '不保存', onClick: () => window.api.allowClose() },

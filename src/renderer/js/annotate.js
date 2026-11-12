@@ -607,6 +607,7 @@
     input.accept = 'image/png,image/jpeg';
     input.style.display = 'none';
     document.body.appendChild(input);
+    input.addEventListener('cancel', () => input.remove());
     input.addEventListener('change', () => {
       const file = input.files && input.files[0];
       if (!file) return;

@@ -124,7 +124,13 @@
 
   const norm = (p) => (p ? String(p).replace(/\\/g, '/').toLowerCase() : '');
 
+  /** 等待当前文档加载结束：加载期间 activate 会被推迟，直接 load 会写进上一个标签页 */
+  async function waitIdle() {
+    for (let i = 0; i < 300 && App.viewer.isLoading(); i++) await new Promise((r) => setTimeout(r, 60));
+  }
+
   async function openPath(path, page) {
+    await waitIdle();
     // 同一个文件已在某个标签页里打开时，直接切过去（Windows 路径大小写/斜杠不敏感）
     const key = norm(path);
     const same = tabs.list.find((t) => norm(t.state.filePath) === key);
@@ -158,6 +164,7 @@
 
   /** 拖放进来、没有真实路径的文件 */
   async function openBytes(bytes, name) {
+    await waitIdle();
     const cur = active();
     const t = cur && !cur.state.pdfDoc && !cur.state.dirty ? cur : createBlank(true);
     if (tabs.activeId !== t.id) activate(t.id);
