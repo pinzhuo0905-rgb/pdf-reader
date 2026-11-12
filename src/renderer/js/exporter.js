@@ -78,7 +78,7 @@
   async function build() {
     const state = S();
     const { PDFDocument, degrees, LineCapStyle, BlendMode } = PDFLib;
-    if (!state.bytes) throw new Error('没有可保存的文档');
+    if (!state.bytes) throw new Error(window.App.i18n.t('toast.exportNoDoc'));
 
     const src = await PDFDocument.load(state.bytes, { ignoreEncryption: true, updateMetadata: false });
 

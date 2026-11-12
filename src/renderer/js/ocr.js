@@ -173,11 +173,11 @@
     window.removeEventListener('pointerdown', onSelDown, true);
 
     if (nw < 0.01 || nh < 0.005) {
-      setStatus('选区太小，请重新框选');
+      setStatus(tr('ocr.regionTooSmall'));
       return;
     }
     setBusy(true);
-    setStatus('正在识别选区…');
+    setStatus(tr('ocr.recognizingRegion'));
     try {
       const shot = await renderPageBitmap(page, REGION_SCALE);
       const sx = Math.max(0, Math.round(nx * shot.width));
@@ -198,7 +198,7 @@
       );
     } catch (err) {
       console.error(err);
-      setStatus('识别失败：' + (err.message || err));
+      setStatus(tr('ocr.failed') + (err.message || err));
     } finally {
       setBusy(false);
     }
@@ -387,7 +387,8 @@
 
   /** 切换语言后刷新面板里的状态文案 */
   function refreshTexts() {
-    if (!ui.busy && $('ocrPanel').classList.contains('hidden')) setStatus(tr('ocr.hint'));
+    // 没有识别结果时把提示语换成当前语言；有结果就保留结果状态
+    if (!ui.busy && !S().ocr) setStatus(tr('ocr.hint'));
     renderList();
   }
 

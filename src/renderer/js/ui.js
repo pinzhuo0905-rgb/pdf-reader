@@ -139,6 +139,7 @@
     'page-input',
     'btn-zoom-in',
     'btn-zoom-out',
+    'zoom-range',
     'btn-fit-width',
     'btn-rotate',
     'btn-viewmode',
@@ -721,7 +722,7 @@
       const bytes = await App.exporter.build();
       let target = st.filePath;
       if (as || !target) {
-        const res = await window.api.saveAs(st.fileName || '未命名.pdf', bytes);
+        const res = await window.api.saveAs(st.fileName || t('file.untitled'), bytes);
         if (!res.ok) {
           App.viewer.hideLoading();
           return false;
@@ -964,7 +965,7 @@
       ['Ctrl + F', t('sc.search')],
       ['Ctrl + Z / Ctrl + Y', t('sc.undoRedo')],
       ['Ctrl + + / Ctrl + -', t('sc.zoom')],
-      ['Ctrl + 滚轮 / Ctrl + ↑↓', t('sc.zoomWheel')],
+      [t('sc.zoomWheelKey'), t('sc.zoomWheel')],
       ['Ctrl + 0', t('sc.fitPage')],
       ['PageUp / PageDown', t('sc.pageNav')],
       ['H / D / E / T', t('sc.tools')],

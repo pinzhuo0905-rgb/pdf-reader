@@ -187,13 +187,13 @@
     if (!t) return;
     if (!force && t.state.dirty) {
       App.ui.showModal(
-        '保存更改？',
-        `“${escapeHtml(label(t))}”有尚未保存的修改，关闭前是否保存？`,
+        tr('tab.closeTitle'),
+        tr('tab.closeDesc', { name: escapeHtml(label(t)) }),
         [
-          { label: '取消' },
-          { label: '不保存并关闭', onClick: () => close(id, true) },
+          { label: tr('modal.cancel') },
+          { label: tr('modal.dontSaveClose'), onClick: () => close(id, true) },
           {
-            label: '保存并关闭',
+            label: tr('tab.saveAndClose'),
             primary: true,
             onClick: async () => {
               const ok = await App.ui.saveTab(t);
@@ -338,7 +338,7 @@
       el.dataset.id = x.id;
       el.classList.toggle('active', x.id === tabs.activeId);
       el.classList.toggle('dirty', !!x.state.dirty);
-      el.title = x.state.filePath || '新标签页';
+      el.title = x.state.filePath || tr('tab.untitled');
       const title = el.querySelector('.tab-title');
       if (title && title.textContent !== label(x)) title.textContent = label(x);
       const ico = el.querySelector('.tab-ico');

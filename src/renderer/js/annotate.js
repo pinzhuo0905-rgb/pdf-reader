@@ -2,6 +2,7 @@
 (function () {
   const App = (window.App = window.App || {});
   const S = () => App.state;
+  const tr = (k, v) => window.App.i18n.t(k, v);
 
   const FONT_STACK = '"Microsoft YaHei", "Segoe UI", "PingFang SC", sans-serif';
 
@@ -739,8 +740,8 @@
       if (sel && !sel.isCollapsed && String(sel).trim()) {
         e.preventDefault();
         App.ui.showCtxMenu(e.clientX, e.clientY, [
-          { label: '复制', icon: 'file', onClick: () => App.ui.copySelection() },
-          { label: '全选', icon: 'check', onClick: () => App.ui.selectAllText() },
+          { label: tr('menu.copy'), icon: 'file', onClick: () => App.ui.copySelection() },
+          { label: tr('menu.selectAll'), icon: 'check', onClick: () => App.ui.selectAllText() },
         ]);
       }
       return;
@@ -750,7 +751,7 @@
     App.viewer.refreshOverlays();
     App.ui.showCtxMenu(e.clientX, e.clientY, [
       {
-        label: a.type === 'text' || a.type === 'textedit' ? '编辑文字' : '删除标注',
+        label: a.type === 'text' || a.type === 'textedit' ? tr('menu.editText') : tr('menu.deleteAnnot'),
         icon: 'editText',
         onClick: () => {
           if (a.type === 'text' || a.type === 'textedit') App.textedit.editExisting(info.page, a);
@@ -761,7 +762,7 @@
         },
       },
       {
-        label: '删除',
+        label: tr('menu.delete'),
         icon: 'close',
         onClick: () => {
           App.annots.remove(info.page.id, a.id);

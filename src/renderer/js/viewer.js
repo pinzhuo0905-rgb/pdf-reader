@@ -162,7 +162,7 @@
     const state = S();
     state.bytes = bytes;
     state.filePath = filePath;
-    state.fileName = fileName || (filePath ? filePath.split(/[\\/]/).pop() : '未命名.pdf');
+    state.fileName = fileName || (filePath ? filePath.split(/[\\/]/).pop() : tr('file.untitled'));
     cache.textContent.clear();
     state.annots = new Map();
     state.ocr = null;
@@ -587,11 +587,14 @@
       await task.promise;
       if (S() !== st) return;
       p.rendered = true;
+      p.canvas.style.visibility = '';
       await buildTextLayer(p, page, zoom);
       drawOverlay(p);
       renderThumbIfOpen(p);
     } catch (err) {
       if (err && err.name !== 'RenderingCancelledException') console.warn('render fail', err);
+      // 渲染失败也要把画布显示出来，否则该页会一直空白
+      p.canvas.style.visibility = '';
     } finally {
       p.rendering = false;
       p._renderStart = 0;
@@ -857,6 +860,20 @@
   }
 
   /* ------------------------------ 页面操作 ------------------------------ */
+
+  /**
+   * 页面尺寸或数量变化后重排：
+   * 旋转/插页/删页都会改变页面尺寸，双页视图下容器宽度必须跟着重算，
+   * 否则会出现「一页占满一行」或横向溢出的错乱。
+   */
+  function relayoutAfterPageChange() {
+    const st = S();
+    if (st.zoomMode === 'fitWidth' || st.zoomMode === 'fitPage' || st.zoomMode === 'auto') computeAutoZoom();
+    const a = captureAnchor();
+    layout();
+    restoreAnchor(a);
+    notifyZoom();
+  }
   function rotatePage(index, delta = 90) {
     const state = S();
     const p = state.pages[index];
@@ -868,7 +885,9 @@
     p.rendered = false;
     p.textItems = null;
     cache.textContent.delete(p.id);
-    // 重建该页 DOM 尺寸
+    // 重建该页 DOM 尺寸。旧画布还是旋转前的比例，先藏起来，
+    // 否则在异步重绘完成前会被拉成新比例（画面明显变形）
+    p.canvas.style.visibility = 'hidden';
     p.el.style.width = p.wPt * state.zoom + 'px';
     p.el.style.height = p.hPt * state.zoom + 'px';
     sizeOverlay(p);
@@ -876,6 +895,7 @@
     App.history.push();
     renderPage(p.id);
     renderThumbIfOpen(p);
+    relayoutAfterPageChange();
     App.ui.toast(tr('toast.pageRotated', { n: index + 1 }));
   }
 
@@ -896,6 +916,7 @@
     App.history.push();
     updatePageIndicator();
     buildThumbs();
+    relayoutAfterPageChange();
     App.ui.toast(tr('toast.pageDeleted', { n: index + 1 }));
   }
 
@@ -933,6 +954,7 @@
     App.history.push();
     updatePageIndicator();
     buildThumbs();
+    relayoutAfterPageChange();
     App.ui.toast(tr('toast.blankInserted'));
   }
 
@@ -1275,6 +1297,7 @@
     rotatePage,
     deletePage,
     insertBlankPage,
+    relayoutAfterPageChange,
     setPageModel,
     toggleSidebar,
     buildThumbs,

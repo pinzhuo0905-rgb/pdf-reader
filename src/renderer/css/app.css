@@ -528,6 +528,9 @@ body[data-lang='en'] {
   flex-wrap: wrap;
   justify-content: center;
   align-content: flex-start;
+  /* 行方向下 align-items 控制的是垂直对齐：必须顶对齐，
+     否则旋转后变矮的那页会浮在行中间（基础规则是 center，用于列方向水平居中） */
+  align-items: flex-start;
   column-gap: 10px;
   row-gap: 18px;
 }
