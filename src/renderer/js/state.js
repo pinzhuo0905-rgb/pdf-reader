@@ -59,8 +59,6 @@
       outline: null,
       /* 共享引用（保持旧代码 S().settings 可用） */
       settings: App.settings,
-      COLORS,
-      newId,
     };
   }
 
