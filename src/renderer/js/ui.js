@@ -6,7 +6,6 @@
 
   const ui = {
     searchTimer: 0,
-    reading: false,
   };
 
   /* ============================== 初始化 ============================== */
@@ -25,7 +24,6 @@
     $('btn-eraser').onclick = () => setTool(S().tool === 'eraser' ? 'select' : 'eraser');
     $('btn-eraser-caret').onclick = (e) => openEraserMenu(e.currentTarget);
     $('btn-textbox').onclick = () => setTool(S().tool === 'textbox' ? 'select' : 'textbox');
-    $('btn-read').onclick = toggleReadAloud;
     $('btn-ocr').onclick = () => App.ocr.toggle();
     $('btn-more').onclick = (e) => openMoreMenu(e.currentTarget);
 
@@ -130,7 +128,6 @@
     'btn-draw-caret',
     'btn-eraser',
     'btn-textbox',
-    'btn-read',
     'btn-ocr',
     'btn-more',
     'btn-editpdf',
@@ -784,51 +781,6 @@
     $('search-count').textContent = `${i + 1}/${s.matches.length}`;
   }
 
-  /* ============================== 朗读 ============================== */
-  function toggleReadAloud() {
-    const btn = $('btn-read');
-    if (ui.reading) {
-      speechSynthesis.cancel();
-      ui.reading = false;
-      btn.classList.remove('active');
-      return;
-    }
-    const st = S();
-    if (!st.pdfDoc) {
-      toast('请先打开 PDF 文件');
-      return;
-    }
-    const texts = [];
-    (async () => {
-      for (let i = st.currentPage; i < st.pages.length; i++) {
-        const items = await App.viewer.ensureTextItems(st.pages[i]);
-        const t = items
-          .map((x) => x.str)
-          .join(' ')
-          .trim();
-        if (t) texts.push(t);
-        if (texts.join('').length > 1200) break;
-      }
-      const content = texts.join(' ').slice(0, 1600);
-      if (!content) {
-        toast('当前页没有可朗读的文字');
-        return;
-      }
-      const u = new SpeechSynthesisUtterance(content);
-      u.lang = /[\u4e00-\u9fa5]/.test(content) ? 'zh-CN' : 'en-US';
-      u.rate = 1;
-      u.onend = () => {
-        ui.reading = false;
-        btn.classList.remove('active');
-      };
-      ui.reading = true;
-      btn.classList.add('active');
-      speechSynthesis.cancel();
-      speechSynthesis.speak(u);
-      toast('开始朗读当前页内容');
-    })();
-  }
-
   /* ============================== 视图 ============================== */
   function toggleTwoUp() {
     S().twoUp = !S().twoUp;
@@ -973,7 +925,7 @@
         <div style="color:var(--text-dim);font-size:12px">版本 ${v.app}</div></div>
       </div>
       <div style="color:var(--text-dim);font-size:12.5px;line-height:1.7">
-        界面与交互参照 Microsoft Edge 内置 PDF 阅读器设计，支持文本选择/复制、高亮、绘制、文本框、朗读，
+        界面与交互参照 Microsoft Edge 内置 PDF 阅读器设计，支持文本选择/复制、高亮、绘制、文本框，
         并提供 PDF 内容编辑（文字修改、插入文本/图片/形状、涂改遮盖、页面管理）与
         自研 OCR 文字识别（DB 文本检测 + CRNN/CTC 识别，纯 JS 实现，中英双语自动切换，可把扫描页转为可复制文本）。<br/>
         Electron ${v.electron} · Chromium ${v.chrome}

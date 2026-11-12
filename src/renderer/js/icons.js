@@ -19,7 +19,6 @@
       <path class="accent-fill" d="M6.1 5.6h7.8v3.5l-1.7 3.1H7.8l-1.7-3.1z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>`,
     eraser: `<g transform="rotate(-38 10 10)"><rect x="3.4" y="7.3" width="13.2" height="5.8" rx="1.7" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10 7.3v5.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></g>${P('M4.0 17.0h12.0')}`,
     textBox: `<rect x="2.7" y="4.3" width="14.6" height="11.4" rx="2.1" fill="none" stroke="currentColor" stroke-width="1.4"/>${P('M6.5 8.1h7M10 8.1v4.4')}`,
-    readAloud: `${P('M3.2 14.3 6.6 5.9l3.4 8.4M4.5 11.4h4.2')}${P('M13.2 8.3a4.6 4.6 0 0 1 0 5.4')}${P('M15.6 6.5a7.2 7.2 0 0 1 0 9')}`,
     more: `
       <text x="0.9" y="14.7" font-size="11.4" font-family="'Segoe UI',sans-serif" fill="currentColor">a</text>
       <text x="8.6" y="14.7" font-size="11.4" font-family="'Segoe UI',sans-serif" fill="currentColor">ö</text>`,

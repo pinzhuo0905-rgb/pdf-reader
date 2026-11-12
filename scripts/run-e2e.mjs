@@ -29,6 +29,10 @@ const env = {
   PDFREADER_TEST: path.resolve(script),
   PDFREADER_SHOT_DELAY: delay,
 };
+// 父进程若带 ELECTRON_RUN_AS_NODE，Electron 会退化成纯 Node，app 为 undefined
+delete env.ELECTRON_RUN_AS_NODE;
+delete env.ELECTRON_NO_ATTACH_CONSOLE;
+delete env.NODE_OPTIONS;
 if (shot) env.PDFREADER_SHOT = path.resolve(shot);
 
 const child = spawn(electron, ['.', 'test/fixtures/sample.pdf'], {
