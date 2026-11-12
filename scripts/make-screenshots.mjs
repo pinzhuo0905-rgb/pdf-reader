@@ -24,14 +24,18 @@ const electron = path.join('node_modules', '.bin', isWin ? 'electron.cmd' : 'ele
 
 function runOne(script, out, delay) {
   return new Promise((resolve) => {
+    const env = {
+      ...process.env,
+      PDFREADER_TEST: path.resolve(script),
+      PDFREADER_SHOT: path.resolve(out),
+      PDFREADER_SHOT_DELAY: String(delay),
+    };
+    // 父进程若带 ELECTRON_RUN_AS_NODE，Electron 会退化成纯 Node
+    delete env.ELECTRON_RUN_AS_NODE;
+    delete env.NODE_OPTIONS;
     const child = spawn(electron, ['.', 'test/fixtures/sample.pdf'], {
       stdio: 'inherit',
-      env: {
-        ...process.env,
-        PDFREADER_TEST: path.resolve(script),
-        PDFREADER_SHOT: path.resolve(out),
-        PDFREADER_SHOT_DELAY: String(delay),
-      },
+      env,
       shell: isWin,
     });
     child.on('exit', (code) => resolve(code ?? 0));
