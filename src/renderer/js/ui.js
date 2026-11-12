@@ -636,9 +636,12 @@
       toast('请先打开一个 PDF 文件');
       return false;
     }
-    if (!App.exporter.hasContent()) {
+    // 用内容指纹判断：撤销回初始状态后按 Ctrl+S 也要能把文件改回去，
+    // 所以不能再用「有没有标注」作为门槛
+    const snap = App.history.snapshot();
+    if (!as && st.savedFingerprint === snap) {
       toast('没有需要保存的修改');
-      return false;
+      return true;
     }
     App.viewer.showLoading('正在保存…');
     try {
@@ -654,17 +657,17 @@
       } else {
         await window.api.save(target, bytes);
       }
-      // 保存后重新加载，清空已写入的标注
+      // 关键：保存后不重新加载文档。
+      // state.bytes 始终是「打开时的原始字节」，每次保存都由「原始 + 当前标注」重新生成，
+      // 因此：视图不会跳回第一页、撤销栈不会丢、重复保存也不会把标注写两遍。
       const name = target.split(/[\\/]/).pop();
-      const page = st.currentPage;
-      const ok = await App.viewer.load(bytes, target, name);
-      if (ok) {
-        App.viewer.scrollToPage(page, false);
-        st.dirty = false;
-        setTitle();
-        App.history.updateUndoButtons();
-      }
+      st.filePath = target;
+      st.fileName = name;
+      st.dirty = false;
+      st.savedFingerprint = snap;
       App.viewer.hideLoading();
+      setTitle();
+      App.history.updateUndoButtons();
       toast('已保存：' + name);
       return true;
     } catch (e) {

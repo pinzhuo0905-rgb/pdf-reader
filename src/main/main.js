@@ -566,6 +566,8 @@ ipcMain.handle('window:isMaximized', (e) => {
 ipcMain.handle('window:fullscreen', (e, value) => {
   const win = BrowserWindow.fromWebContents(e.sender);
   if (!win) return false;
+  // 自检模式窗口是隐藏的，setFullScreen 会把它弹到屏幕上，直接忽略
+  if (HEADLESS) return win.isFullScreen();
   const next = typeof value === 'boolean' ? value : !win.isFullScreen();
   win.setFullScreen(next);
   return next;

@@ -181,6 +181,8 @@
     }
     state.pages = model.map((m) => hydratePage(m));
     state.currentPage = 0;
+    // 刚打开时的内容指纹：之后 Ctrl+S 只在真的改过时才写盘
+    state.savedFingerprint = App.history.snapshot();
 
     // 初始缩放
     computeAutoZoom();

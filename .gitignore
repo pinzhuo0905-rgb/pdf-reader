@@ -29,3 +29,6 @@ desktop.ini
 !test/fixtures/*.pdf
 screenshot*.png
 !docs/screenshots/*.png
+
+# 自检产生的临时文件
+test/fixtures/.tmp-*

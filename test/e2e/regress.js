@@ -14,7 +14,7 @@
     /* 1) 仅旋转页面也应可保存，且旋转写入 PDF */
     App.viewer.rotatePage(0, 90);
     await sleep(500);
-    assert('rotateOnlyHasContent', App.exporter.hasContent() === true);
+    assert('rotateMakesDirty', App.history.snapshot() !== App.state.savedFingerprint);
     const bytes = await App.exporter.build();
     const doc = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
     const p1 = await doc.getPage(1);

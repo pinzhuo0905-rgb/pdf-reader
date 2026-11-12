@@ -280,25 +280,5 @@
     });
   }
 
-  /** 页面是否被旋转过（相对打开文件时的原始角度） */
-  function rotationChanged() {
-    const norm = (v) => (((v || 0) % 360) + 360) % 360;
-    return S().pages.some((p) => norm(p.rot) !== norm(p.origRot));
-  }
-
-  /** 页面是否有需要写入的内容 */
-  function hasContent() {
-    let n = 0;
-    S().annots.forEach((l) => (n += l.length));
-    // 只旋转页面、没有任何标注时也必须允许保存，否则旋转会丢失
-    return n > 0 || isStructural() || rotationChanged();
-  }
-
-  function isStructural() {
-    const st = S();
-    if (!st.pdfDoc) return false;
-    return st.pages.length !== st.numPagesSrc || st.pages.some((p, i) => p.src !== i);
-  }
-
-  App.exporter = { build, hasContent };
+  App.exporter = { build };
 })();

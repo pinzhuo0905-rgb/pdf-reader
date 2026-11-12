@@ -52,6 +52,8 @@
       selected: null, // {pageId, annotId}
       /* 其它 */
       dirty: false,
+      /** 上次保存（或刚打开）时的内容指纹，用于判断是否真的有改动 */
+      savedFingerprint: null,
       history: [],
       hIndex: -1,
       search: { query: '', matches: [], index: -1 },
@@ -190,6 +192,6 @@
   App.state = createDocState();
   App.createDocState = createDocState;
   App.COLORS = COLORS;
-  App.history = { push: pushHistory, reset: resetHistory, undo, redo, updateUndoButtons };
+  App.history = { push: pushHistory, reset: resetHistory, undo, redo, updateUndoButtons, snapshot };
   App.annots = { get: getAnnots, add: addAnnot, remove: removeAnnot, find: findAnnot, has: hasAnnots };
 })();
