@@ -96,7 +96,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "PDF 阅读器",
+      "shortcutName": "PDF Reader",
       "artifactName": "PDFReader-Setup-${version}.exe",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",

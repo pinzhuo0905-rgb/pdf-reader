@@ -607,7 +607,7 @@
       return;
     }
     const st = S();
-    document.title = st.fileName ? `${st.fileName}${st.dirty ? ' *' : ''} - PDF 阅读器` : 'PDF 阅读器';
+    document.title = st.fileName ? `${st.fileName}${st.dirty ? ' *' : ''} - PDF Reader` : 'PDF Reader';
   }
 
   async function save(as) {
@@ -922,7 +922,7 @@
       '关于',
       `<div style="display:flex;gap:14px;align-items:center;margin-bottom:10px">
         <img src="assets/pdf-icon-256.png" style="width:56px;height:56px"/>
-        <div><div style="font-size:15px;font-weight:600">PDF 阅读器</div>
+        <div><div style="font-size:15px;font-weight:600">PDF Reader</div>
         <div style="color:var(--text-dim);font-size:12px">版本 ${v.app}</div></div>
       </div>
       <div style="color:var(--text-dim);font-size:12.5px;line-height:1.7">

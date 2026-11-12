@@ -135,7 +135,7 @@ function createWindow(opts = {}) {
     minHeight: 480,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1f1f1f' : '#f5f5f5',
     icon: path.join(ASSETS_DIR, 'pdf-icon-256.png'),
-    title: 'PDF 阅读器',
+    title: 'PDF Reader',
     show: false,
     autoHideMenuBar: true,
     webPreferences: {

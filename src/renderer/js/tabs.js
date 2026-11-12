@@ -293,8 +293,8 @@
     if (!t) return;
     paintStrip();
     document.title = t.state.fileName
-      ? `${t.state.fileName}${t.state.dirty ? ' *' : ''} - PDF 阅读器`
-      : 'PDF 阅读器';
+      ? `${t.state.fileName}${t.state.dirty ? ' *' : ''} - PDF Reader`
+      : 'PDF Reader';
   }
 
   /* ============================== 拖拽 ============================== */
