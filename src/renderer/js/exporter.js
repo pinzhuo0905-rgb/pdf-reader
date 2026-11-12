@@ -53,6 +53,12 @@
     };
   }
 
+  /** 显示尺寸（考虑 /Rotate）：旋转 90/270 时宽高互换 */
+  function dispSize(W, H, R) {
+    const r = ((R % 360) + 360) % 360;
+    return r % 180 === 0 ? { w: W, h: H } : { w: H, h: W };
+  }
+
   function hexToRgb(hex) {
     const m = /^#?([0-9a-f]{6})$/i.exec(hex || '#000000');
     if (!m) return PDFLib.rgb(0, 0, 0);
@@ -131,10 +137,13 @@
   function drawAnnot(doc, page, a, W, H, R, font, lib) {
     const { degrees, LineCapStyle, BlendMode } = lib;
     const rgb = hexToRgb;
+    // 标注坐标是「显示坐标系」的归一化值：宽高必须用旋转后的显示尺寸，
+    // 否则 /Rotate 90/270 的页面上标注会整体错位（之前用未旋转的 W/H）
+    const { w: DW, h: DH } = dispSize(W, H, R);
     switch (a.type) {
       case 'highlight': {
         for (const r of a.rects) {
-          const rc = mapRect(W, H, R, r.x * W, r.y * H, r.w * W, r.h * H);
+          const rc = mapRect(W, H, R, r.x * DW, r.y * DH, r.w * DW, r.h * DH);
           page.drawRectangle({
             ...rc,
             color: rgb(a.color),
@@ -146,14 +155,14 @@
         break;
       }
       case 'whiteout': {
-        const rc = mapRect(W, H, R, a.x * W, a.y * H, a.w * W, a.h * H);
+        const rc = mapRect(W, H, R, a.x * DW, a.y * DH, a.w * DW, a.h * DH);
         page.drawRectangle({ ...rc, color: rgb(a.color || '#ffffff'), opacity: 1, borderWidth: 0 });
         break;
       }
       case 'ink': {
         for (let i = 1; i < a.points.length; i++) {
-          const p0 = mapPoint(W, H, R, a.points[i - 1].x * W, a.points[i - 1].y * H);
-          const p1 = mapPoint(W, H, R, a.points[i].x * W, a.points[i].y * H);
+          const p0 = mapPoint(W, H, R, a.points[i - 1].x * DW, a.points[i - 1].y * DH);
+          const p1 = mapPoint(W, H, R, a.points[i].x * DW, a.points[i].y * DH);
           page.drawLine({
             start: p0,
             end: p1,
@@ -163,7 +172,7 @@
           });
         }
         if (a.points.length === 1) {
-          const p0 = mapPoint(W, H, R, a.points[0].x * W, a.points[0].y * H);
+          const p0 = mapPoint(W, H, R, a.points[0].x * DW, a.points[0].y * DH);
           page.drawLine({
             start: p0,
             end: { x: p0.x + 0.6, y: p0.y },
@@ -175,7 +184,7 @@
         break;
       }
       case 'shape': {
-        const rc = mapRect(W, H, R, a.x * W, a.y * H, a.w * W, a.h * H);
+        const rc = mapRect(W, H, R, a.x * DW, a.y * DH, a.w * DW, a.h * DH);
         if (a.kind === 'rect') {
           page.drawRectangle({
             ...rc,
@@ -193,8 +202,8 @@
             borderWidth: a.width || 2,
           });
         } else {
-          const p0 = mapPoint(W, H, R, a.x * W, a.y * H);
-          const p1 = mapPoint(W, H, R, (a.x + a.w) * W, (a.y + a.h) * H);
+          const p0 = mapPoint(W, H, R, a.x * DW, a.y * DH);
+          const p1 = mapPoint(W, H, R, (a.x + a.w) * DW, (a.y + a.h) * DH);
           page.drawLine({
             start: p0,
             end: p1,
@@ -222,12 +231,12 @@
         const bytes = dataUrlToBytes(a.data);
         const isPng = a.data.startsWith('data:image/png');
         const img = isPng ? doc.embedPng(bytes) : doc.embedJpg(bytes);
-        const anchor = mapPoint(W, H, R, a.x * W, (a.y + a.h) * H);
+        const anchor = mapPoint(W, H, R, a.x * DW, (a.y + a.h) * DH);
         page.drawImage(img, {
           x: anchor.x,
           y: anchor.y,
-          width: a.w * W,
-          height: a.h * H,
+          width: a.w * DW,
+          height: a.h * DH,
           rotate: degrees(R),
         });
         break;
@@ -235,7 +244,7 @@
       case 'text':
       case 'textedit': {
         if (a.type === 'textedit' && a.cover !== false) {
-          const rc = mapRect(W, H, R, a.x * W, a.y * H, a.w * W, a.h * H);
+          const rc = mapRect(W, H, R, a.x * DW, a.y * DH, a.w * DW, a.h * DH);
           page.drawRectangle({ ...rc, color: rgb(a.bg || '#ffffff'), borderWidth: 0 });
         }
         if (!a.text || !font) break;
@@ -249,15 +258,16 @@
 
   function drawTextBox(page, a, W, H, R, font, degrees, rgb) {
     const size = a.size || 14;
-    const boxW = a.w * W;
+    const { w: DW, h: DH } = dispSize(W, H, R);
+    const boxW = a.w * DW;
     const lines = wrapPdf(font, a.text, size, boxW);
     const lh = size * 1.25;
     lines.forEach((line, i) => {
-      let dx = a.x * W;
+      let dx = a.x * DW;
       const tw = font.widthOfTextAtSize(line, size);
       if (a.align === 'center') dx += (boxW - tw) / 2;
       else if (a.align === 'right') dx += boxW - tw;
-      const dy = a.y * H + i * lh + size * 0.86;
+      const dy = a.y * DH + i * lh + size * 0.86;
       const anchor = mapPoint(W, H, R, dx, dy);
       page.drawText(line, {
         x: anchor.x,
@@ -270,39 +280,18 @@
     });
   }
 
-  function wrapPdf(font, text, size, maxWidth) {
-    const out = [];
-    for (const para of String(text).split('\n')) {
-      if (!para) {
-        out.push('');
-        continue;
-      }
-      let line = '';
-      for (const ch of para) {
-        const test = line + ch;
-        let w = 0;
-        try {
-          w = font.widthOfTextAtSize(test, size);
-        } catch {
-          w = test.length * size * 0.6;
-        }
-        if (w > maxWidth && line) {
-          out.push(line);
-          line = ch;
-        } else {
-          line = test;
-        }
-      }
-      out.push(line);
-    }
-    return out;
+  /** 页面是否被旋转过（相对打开文件时的原始角度） */
+  function rotationChanged() {
+    const norm = (v) => (((v || 0) % 360) + 360) % 360;
+    return S().pages.some((p) => norm(p.rot) !== norm(p.origRot));
   }
 
   /** 页面是否有需要写入的内容 */
   function hasContent() {
     let n = 0;
     S().annots.forEach((l) => (n += l.length));
-    return n > 0 || isStructural();
+    // 只旋转页面、没有任何标注时也必须允许保存，否则旋转会丢失
+    return n > 0 || isStructural() || rotationChanged();
   }
 
   function isStructural() {
@@ -311,5 +300,5 @@
     return st.pages.length !== st.numPagesSrc || st.pages.some((p, i) => p.src !== i);
   }
 
-  App.exporter = { build, hasContent, isStructural };
+  App.exporter = { build, hasContent };
 })();

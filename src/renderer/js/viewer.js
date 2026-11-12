@@ -185,6 +185,8 @@
     // 初始缩放
     computeAutoZoom();
     buildDom();
+    // 侧栏若开着，用新文档的页面重建缩略图（激活时文档还没加载完，那里只能清空）
+    if (isSidebarOpen()) buildThumbs();
     App.history.reset();
     state.dirty = false;
     hideLoading();
@@ -208,6 +210,7 @@
     return {
       ...m,
       rot,
+      origRot: rot, // 打开文件时的原始旋转，用于判断「仅旋转」是否需要保存
       wPt: swapped ? m.baseH : m.baseW,
       hPt: swapped ? m.baseW : m.baseH,
       el: null,
@@ -261,7 +264,6 @@
     const anchor = captureAnchor();
     layout();
     restoreAnchor(anchor);
-    App.ui.updateZoomLabel();
   }
 
   function zoomIn() {
@@ -540,10 +542,6 @@
     for (const p of S().pages) if (p.overlay && p.rendered) drawOverlay(p);
   }
 
-  function getPageEl(pageId) {
-    return S().pages.find((x) => x.id === pageId) || null;
-  }
-
   /* ------------------------------ 滚动与页码 ------------------------------ */
   function onScroll() {
     if (scrollRaf) return;
@@ -643,7 +641,6 @@
       computeAutoZoom();
       layout();
       restoreAnchor(a);
-      App.ui.updateZoomLabel();
     }
   }
 
@@ -704,11 +701,10 @@
     };
     const p = hydratePage(model);
     state.pages.splice(index + 1, 0, p);
-    const after = state.pages[index + 1];
+    // createPageEl 会追加到末尾，这里把它移到「原 index 页之后」的正确位置
     const div = createPageEl(p);
-    if (after && after.el && after.el.nextSibling) {
-      el.pages.insertBefore(div, after.el.nextSibling);
-    }
+    const next = state.pages[index + 2];
+    if (next && next.el) el.pages.insertBefore(div, next.el);
     // 空白页直接画白
     p.canvas.width = Math.max(1, Math.round(p.wPt * state.zoom * (window.devicePixelRatio || 1)));
     p.canvas.height = Math.max(1, Math.round(p.hPt * state.zoom * (window.devicePixelRatio || 1)));
@@ -766,6 +762,8 @@
     } catch {
       items = null;
     }
+    // 期间切换了标签页：丢弃，避免把旧文档的书签画到新标签页上
+    if (S() !== st) return;
     st.outline = items && items.length ? items : null;
     if (!st.outline) {
       box.classList.add('hidden');
@@ -909,10 +907,14 @@
   }
 
   /* -------------------------------- 搜索 -------------------------------- */
+  let searchToken = 0;
+
   async function search(query) {
     const state = S();
-    state.search = { query, matches: [], index: -1 };
+    const token = ++searchToken;
+    const local = [];
     if (!query || !state.pdfDoc) {
+      state.search = { query: '', matches: [], index: -1 };
       refreshOverlays();
       return state.search;
     }
@@ -920,6 +922,7 @@
     for (let i = 0; i < state.pages.length; i++) {
       const p = state.pages[i];
       const items = await ensureTextItems(p);
+      if (token !== searchToken) return state.search; // 已被更新的搜索取代
       for (const it of items) {
         const hay = it.str.toLowerCase();
         let from = 0;
@@ -936,12 +939,14 @@
             w: (x1 - x0) / (p.wPt * state.zoom),
             h: (it.height * 1.15) / (p.hPt * state.zoom),
           });
-          state.search.matches.push({ pageId: p.id, pageIndex: i, rects });
+          local.push({ pageId: p.id, pageIndex: i, rects });
           from = idx + Math.max(1, q.length);
         }
       }
     }
-    if (state.search.matches.length) {
+    if (token !== searchToken) return state.search;
+    state.search = { query, matches: local, index: -1 };
+    if (local.length) {
       state.search.index = 0;
       gotoSearcMatch(0);
     } else {
@@ -1031,7 +1036,6 @@
     refreshOverlays,
     updatePageIndicator,
     scrollToPage,
-    getPageEl,
     getTextItems,
     ensureTextItems,
     rotatePage,

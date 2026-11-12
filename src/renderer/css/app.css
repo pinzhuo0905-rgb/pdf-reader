@@ -580,24 +580,6 @@ body {
   background: rgba(0, 114, 201, 0.28);
 }
 
-.page.loading::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(100deg, #f3f3f3 30%, #fafafa 50%, #f3f3f3 70%);
-  background-size: 300% 100%;
-  animation: shimmer 1.3s infinite linear;
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: -100% 0;
-  }
-}
-
 /* 文字可选中 */
 .page .textLayer span::selection {
   background: rgba(0, 114, 201, 0.3);
@@ -726,7 +708,6 @@ body {
   border-radius: 4px;
 }
 
-.thumb img,
 .thumb canvas {
   display: block;
   width: 100%;

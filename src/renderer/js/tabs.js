@@ -207,7 +207,6 @@
     } else {
       render();
     }
-    if (!tabs.list.length) createBlank(true);
   }
 
   function closeOthers(id) {
@@ -459,7 +458,7 @@
       render();
       return;
     }
-    detach(t, e.clientX, e.clientY);
+    detach(t);
   }
 
   /** 只把标签页从列表里移除，不补空白页（用于「搬到别的窗口」） */
@@ -485,39 +484,41 @@
    * - 否则 -> 开一个新窗口
    * 源窗口因此变空时直接关窗，不再补空白页。
    */
-  async function detach(t, x, y) {
+  async function detach(t, force) {
     const st = t.state;
     if (!st.filePath) {
       App.ui.toast('该标签页还没有对应的文件，无法拖出');
       paintStrip();
-      return;
+      return { skipped: true };
     }
     if (st.dirty) {
       App.ui.toast('请先保存该标签页，再拖出');
       paintStrip();
-      return;
+      return { skipped: true };
     }
-    const only = tabs.list.length === 1;
+    // force=true：右键「在新窗口中打开」，即使这是唯一标签也要开新窗口
+    const only = tabs.list.length === 1 && !force;
     let res = null;
     try {
-      res = await window.api.detachTab({ path: st.filePath, page: st.currentPage + 1, x, y, only });
+      res = await window.api.detachTab({ path: st.filePath, page: st.currentPage + 1, only });
     } catch (e) {
       App.ui.toast('移动失败：' + (e.message || e));
       paintStrip();
-      return;
+      return { skipped: true };
     }
     if (res && res.skipped) {
       App.ui.toast('松手位置没有其他窗口');
       paintStrip();
-      return;
+      return res;
     }
     removeTab(t.id);
     if (!tabs.list.length) {
       // 源窗口已空：直接关闭（有未保存修改的标签页已在上面拦掉）
       window.api.allowClose();
-      return;
+      return res;
     }
     App.ui.toast(res && res.merged ? '已移动到另一个窗口' : '已在新窗口中打开');
+    return res;
   }
 
   /* ============================== 标签右键菜单 ============================== */
@@ -540,7 +541,7 @@
         {
           label: '在新窗口中打开',
           icon: 'expand',
-          onClick: () => detach(t, 0, 0),
+          onClick: () => detach(t, true),
         }
       );
     }
@@ -579,7 +580,6 @@
     openPath,
     openBytes,
     close,
-    closeOthers,
     refreshActive,
     detach,
   };

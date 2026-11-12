@@ -5,7 +5,6 @@
   const $ = (id) => document.getElementById(id);
 
   const ui = {
-    menuOpen: false,
     searchTimer: 0,
     reading: false,
   };
@@ -221,6 +220,13 @@
 
     // OCR 面板显示当前标签页的结果
     App.ocr.renderList();
+
+    // 侧栏是全局唯一的：切换标签页后必须重画缩略图与书签，否则会停留在上一个文档
+    if (App.viewer.isSidebarOpen()) {
+      App.viewer.buildThumbs();
+      App.viewer.buildOutline();
+    }
+
     setTitle();
   }
 
@@ -379,7 +385,6 @@
   function closeMenus() {
     $('menuLayer').classList.add('hidden');
     $('menuLayer').innerHTML = '';
-    ui.menuOpen = false;
   }
 
   function showMenu(anchor, html, opts = {}) {
@@ -399,7 +404,6 @@
     }
     menu.style.left = left + 'px';
     menu.style.top = top + 'px';
-    ui.menuOpen = true;
     return menu;
   }
 
@@ -604,19 +608,7 @@
   }
 
   async function openPath(path, page) {
-    if (App.tabs) return App.tabs.openPath(path, page);
-    try {
-      const res = await window.api.readFile(path);
-      const bytes = new Uint8Array(res.data);
-      const ok = await App.viewer.load(bytes, res.path, res.name);
-      if (ok) {
-        $('empty').classList.add('hidden');
-        setTitle();
-      }
-    } catch (e) {
-      console.error(e);
-      toast('打开失败：' + e.message);
-    }
+    return App.tabs.openPath(path, page);
   }
 
   /** 保存指定标签页（必要时先切过去） */
@@ -820,10 +812,6 @@
     $('btn-fullscreen').classList.toggle('active', v);
   }
 
-  function updateZoomLabel() {
-    // 工具栏未显示百分比（与 Edge 一致），此处保留接口
-  }
-
   /* ============================ 文本选择/复制 ============================ */
   function selectedText() {
     const sel = window.getSelection();
@@ -1000,6 +988,8 @@
     const ctrl = e.ctrlKey || e.metaKey;
     const key = e.key;
     const st = S();
+    const active = document.activeElement;
+    const typing = !!active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
 
     if (ctrl && key.toLowerCase() === 'o') {
       e.preventDefault();
@@ -1055,7 +1045,7 @@
       if (!$('ocrPanel').classList.contains('hidden')) App.ocr.close();
       else if (!$('searchbar').classList.contains('hidden')) closeSearch();
       else if (st.tool !== 'select') setTool('select');
-    } else if (key === 'Delete' || key === 'Backspace') {
+    } else if (!typing && (key === 'Delete' || key === 'Backspace')) {
       const sel = st.selected;
       if (sel) {
         const a = App.annots.find(sel.pageId, sel.annotId);
@@ -1066,10 +1056,10 @@
         }
         e.preventDefault();
       }
-    } else if (key === 'PageDown') {
+    } else if (!typing && key === 'PageDown') {
       App.viewer.scrollToPage(Math.min(st.pages.length - 1, st.currentPage + 1));
       e.preventDefault();
-    } else if (key === 'PageUp') {
+    } else if (!typing && key === 'PageUp') {
       App.viewer.scrollToPage(Math.max(0, st.currentPage - 1));
       e.preventDefault();
     } else if (!ctrl && !e.altKey) {
@@ -1163,7 +1153,6 @@
     setTitle,
     save,
     applyTheme,
-    updateZoomLabel,
     setDocState,
     syncTabUI,
     saveTab,
@@ -1172,6 +1161,5 @@
     selectAllText,
     openPath,
     showModal,
-    closeModal,
   };
 })();

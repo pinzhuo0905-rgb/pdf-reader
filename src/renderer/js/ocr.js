@@ -42,8 +42,10 @@
 
   function close() {
     $('ocrPanel').classList.add('hidden');
-    ui.selecting = false;
-    $('main').classList.remove('ocr-selecting');
+    if (ui.selecting) {
+      stopRegionSelect(); // 清掉监听器，否则关面板后点页面还会进入框选
+      setStatus('把扫描页或图片中的文字识别为可复制的文本');
+    }
   }
 
   function toggle() {
@@ -109,6 +111,7 @@
       App.ui.toast('请先打开 PDF 文件');
       return;
     }
+    if (ui.selecting) return;
     ui.selecting = true;
     $('main').classList.add('ocr-selecting');
     setStatus('在页面上拖拽框选要识别的区域…（Esc 取消）');
@@ -127,6 +130,7 @@
 
   let rubber = null;
   function onSelDown(e) {
+    if (!ui.selecting) return;
     const el = e.target.closest && e.target.closest('.page');
     if (!el) return;
     const page = S().pages.find((p) => p.el === el);
@@ -223,6 +227,7 @@
 
   /* --------------------------- 调用引擎 --------------------------- */
   async function recognize(shot, page, offX, offY, spanW, spanH) {
+    const st = S();
     setStatus('正在识别文字…');
     const ctx = shot.canvas.getContext('2d');
     const imgData = ctx.getImageData(0, 0, shot.width, shot.height);
@@ -255,7 +260,9 @@
         h: h * spanH,
       };
     });
-    S().ocr = { pageId: page.id, boxes: lines, visible: $('ocr-show-boxes').checked };
+    // 识别期间切换了标签页：结果丢弃，避免写到别的标签页上
+    if (S() !== st) return;
+    st.ocr = { pageId: page.id, boxes: lines, visible: $('ocr-show-boxes').checked };
     ui.activeIndex = -1;
     renderList();
     App.viewer.refreshOverlays();

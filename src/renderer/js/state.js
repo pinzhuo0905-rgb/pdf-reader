@@ -77,7 +77,10 @@
       baseH: p.baseH,
     }));
     const annots = {};
-    s.annots.forEach((list, id) => (annots[id] = JSON.parse(JSON.stringify(list))));
+    // 剔除 _img（HTMLImageElement），否则每步撤销快照都会把整张 base64 图再存一份
+    s.annots.forEach(
+      (list, id) => (annots[id] = JSON.parse(JSON.stringify(list, (k, v) => (k === '_img' ? undefined : v))))
+    );
     return JSON.stringify({ pages, annots });
   }
 

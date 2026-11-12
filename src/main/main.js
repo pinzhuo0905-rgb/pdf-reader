@@ -83,8 +83,6 @@ function settingsFile() {
 
 const DEFAULT_SETTINGS = {
   theme: 'light', // light | dark | system
-  defaultZoom: 'auto', // auto | fitWidth | fitPage | 100
-  showPageNumber: true,
   lastDir: '',
 };
 
@@ -571,11 +569,6 @@ ipcMain.handle('window:fullscreen', (e, value) => {
   const next = typeof value === 'boolean' ? value : !win.isFullScreen();
   win.setFullScreen(next);
   return next;
-});
-
-ipcMain.handle('window:isFullscreen', (e) => {
-  const win = BrowserWindow.fromWebContents(e.sender);
-  return win ? win.isFullScreen() : false;
 });
 
 // 打印：由渲染进程提供页面图片与尺寸，这里开一个隐藏窗口打印

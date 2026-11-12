@@ -21,7 +21,6 @@ contextBridge.exposeInMainWorld('api', {
   headless: !!(process.env.PDFREADER_TEST || process.env.PDFREADER_SHOT),
   windowCount: () => ipcRenderer.invoke('window:count'),
   onWindowCount: (cb) => ipcRenderer.on('windows:count', (_e, n) => cb(n)),
-  isFullscreen: () => ipcRenderer.invoke('window:isFullscreen'),
   printPages: (payload) => ipcRenderer.invoke('print:pages', payload),
   loadCjkFont: () => ipcRenderer.invoke('font:load'),
   ocrWarmup: () => ipcRenderer.invoke('ocr:warmup'),
