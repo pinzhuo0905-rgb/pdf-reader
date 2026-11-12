@@ -128,8 +128,21 @@
 
 安装包未做代码签名，首次运行 Windows SmartScreen 可能提示「未知发布者」→ 更多信息 → 仍要运行。
 
-安装后 `.pdf` 文件即可在「打开方式」中选择本程序；想设为默认，右键任意 PDF →
-打开方式 → 选择其他应用 → **PDF Reader**，或菜单 `⋯ → 设为默认 PDF 阅读器`。
+安装后 `.pdf` 文件即可在「打开方式」中选择本程序。
+
+**设为默认 PDF 阅读器**有两种方式：
+
+1. **静默设置（推荐，全程无弹窗）**——普通权限即可，纯注册表操作：
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\set-default-pdf.ps1
+   ```
+
+   脚本会把本程序注册为 `.pdf` 的处理程序、写入「打开方式」列表，并清掉系统里那条
+   被哈希保护的 `UserChoice`（原选择会备份到 `%APPDATA%\pdf-reader\assoc-backup.json`，
+   加 `-Restore` 可还原）。
+
+2. 右键任意 PDF → 打开方式 → 选择其他应用 → **PDF Reader**，或菜单 `⋯ → 设为默认 PDF 阅读器`。
 
 ### 方式二：从源码运行
 
