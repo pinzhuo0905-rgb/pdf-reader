@@ -213,6 +213,140 @@
     }
   }
 
+  /* --------------------------- 文本框：手柄与尺寸 --------------------------- */
+  const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+  const HANDLE_HIT = 7; // 手柄命中半径（CSS px）
+  const CURSORS = {
+    nw: 'nwse-resize',
+    se: 'nwse-resize',
+    ne: 'nesw-resize',
+    sw: 'nesw-resize',
+    n: 'ns-resize',
+    s: 'ns-resize',
+    e: 'ew-resize',
+    w: 'ew-resize',
+  };
+
+  /** 有 x/y/w/h 四个量、可以拖拽缩放的标注 */
+  function isBoxAnnot(a) {
+    return (
+      !!a &&
+      (a.type === 'text' || a.type === 'textedit' || a.type === 'whiteout' || a.type === 'shape' || a.type === 'image')
+    );
+  }
+
+  function handlePoints(a) {
+    const { x, y, w, h } = a;
+    return {
+      nw: [x, y],
+      n: [x + w / 2, y],
+      ne: [x + w, y],
+      e: [x + w, y + h / 2],
+      se: [x + w, y + h],
+      s: [x + w / 2, y + h],
+      sw: [x, y + h],
+      w: [x, y + h / 2],
+    };
+  }
+
+  /** 命中「已选中标注」的缩放手柄 */
+  function hitHandle(page, nx, ny) {
+    const sel = S().selected;
+    if (!sel || sel.pageId !== page.id) return null;
+    const a = App.annots.find(page.id, sel.annotId);
+    if (!isBoxAnnot(a)) return null;
+    const zoom = S().zoom;
+    const px = nx * page.wPt * zoom;
+    const py = ny * page.hPt * zoom;
+    const pts = handlePoints(a);
+    for (const k of HANDLES) {
+      const cx = pts[k][0] * page.wPt * zoom;
+      const cy = pts[k][1] * page.hPt * zoom;
+      if (Math.abs(px - cx) <= HANDLE_HIT && Math.abs(py - cy) <= HANDLE_HIT) return k;
+    }
+    return null;
+  }
+
+  /** 文本框高度自动跟随内容：改窄/改字后把框撑到刚好放下文字 */
+  function fitTextHeight(page, a) {
+    if (!a || (a.type !== 'text' && a.type !== 'textedit') || !a.text) return;
+    const ctx = page.overlay.getContext('2d');
+    const zoom = S().zoom;
+    const w = page.wPt * zoom;
+    const h = page.hPt * zoom;
+    const size = (a.size || 14) * zoom;
+    ctx.save();
+    ctx.font = `${size}px ${FONT_STACK}`;
+    const lines = wrapLines(ctx, a.text, Math.max(8, a.w * w));
+    ctx.restore();
+    const need = (lines.length * size * 1.25 + 2) / h;
+    if (a.h < need) a.h = Math.min(1 - a.y, need);
+  }
+
+  /** 拖动缩放手柄 */
+  function resizeAnnot(d, nx, ny) {
+    const a = d.annot;
+    if (!a) return;
+    const o = d.orig;
+    const k = d.handle;
+    const dx = nx - d.startX;
+    const dy = ny - d.startY;
+    let x = o.x;
+    let y = o.y;
+    let w = o.w;
+    let h = o.h;
+    if (k.includes('e')) w = o.w + dx;
+    if (k.includes('s')) h = o.h + dy;
+    if (k.includes('w')) {
+      x = o.x + dx;
+      w = o.w - dx;
+    }
+    if (k.includes('n')) {
+      y = o.y + dy;
+      h = o.h - dy;
+    }
+
+    const zoom = S().zoom;
+    const minW = Math.max(0.02, 24 / (d.page.wPt * zoom));
+    const minH = Math.max(0.012, 18 / (d.page.hPt * zoom));
+    if (w < minW) {
+      if (k.includes('w')) x = o.x + o.w - minW;
+      w = minW;
+    }
+    if (h < minH) {
+      if (k.includes('n')) y = o.y + o.h - minH;
+      h = minH;
+    }
+    x = Math.max(0, Math.min(1 - minW, x));
+    y = Math.max(0, Math.min(1 - minH, y));
+    w = Math.min(w, 1 - x);
+    h = Math.min(h, 1 - y);
+
+    a.x = x;
+    a.y = y;
+    a.w = w;
+    a.h = h;
+    fitTextHeight(d.page, a);
+    App.viewer.refreshOverlays();
+  }
+
+  /** 鼠标悬停时给出手柄/移动光标，便于发现可拖拽 */
+  function updateCursor(e) {
+    const info = pageFromEvent(e);
+    if (!info) return;
+    const page = info.page;
+    const tool = S().tool;
+    if (tool !== 'select' && tool !== 'textbox') {
+      if (page.el.style.cursor) page.el.style.cursor = '';
+      return;
+    }
+    let cur = '';
+    const h = hitHandle(page, info.nx, info.ny);
+    if (h) cur = CURSORS[h] || '';
+    else if (hitTest(page, info.nx, info.ny)) cur = 'move';
+    if (page.el.style.cursor !== cur) page.el.style.cursor = cur;
+  }
+
   /* ------------------------------ 交互实现 ------------------------------ */
   let drag = null;
   let pagesEl = null;
@@ -250,6 +384,28 @@
     const { page, nx, ny } = info;
     const tool = S().tool;
 
+    // 已选中的框：先判缩放手柄（缩放），再判框内（移动）
+    if (tool === 'select' || tool === 'textbox' || tool === 'textedit') {
+      const sel = S().selected;
+      const selAnnot = sel && sel.pageId === page.id ? App.annots.find(page.id, sel.annotId) : null;
+      const handle = selAnnot ? hitHandle(page, nx, ny) : null;
+      if (handle) {
+        drag = {
+          kind: 'resize',
+          page,
+          annot: selAnnot,
+          handle,
+          startX: nx,
+          startY: ny,
+          orig: { x: selAnnot.x, y: selAnnot.y, w: selAnnot.w, h: selAnnot.h },
+          moved: false,
+        };
+        page.el.style.cursor = CURSORS[handle] || '';
+        e.preventDefault();
+        return;
+      }
+    }
+
     // 文本选择工具下不拦截
     if (tool === 'select') {
       const a = hitTest(page, nx, ny);
@@ -257,6 +413,7 @@
         S().selected = { pageId: page.id, annotId: a.id };
         App.viewer.refreshOverlays();
         drag = { kind: 'move', page, annot: a, startX: nx, startY: ny, moved: false };
+        page.el.style.cursor = 'move';
         e.preventDefault();
       } else if (S().selected) {
         S().selected = null;
@@ -275,6 +432,16 @@
     }
 
     if (tool === 'textbox') {
+      const a = hitTest(page, nx, ny);
+      if (a && (a.type === 'text' || a.type === 'textedit')) {
+        // 点已有的文本框：拖动移动，而不是叠一个新的
+        S().selected = { pageId: page.id, annotId: a.id };
+        App.viewer.refreshOverlays();
+        drag = { kind: 'move', page, annot: a, startX: nx, startY: ny, moved: false };
+        page.el.style.cursor = 'move';
+        e.preventDefault();
+        return;
+      }
       openTextCreator(page, nx, ny);
       return;
     }
@@ -285,6 +452,11 @@
     }
 
     if (tool === 'textedit') {
+      const a = hitTest(page, nx, ny);
+      if (a && (a.type === 'text' || a.type === 'textedit')) {
+        App.textedit.editExisting(page, a);
+        return;
+      }
       App.textedit.startAt(page, nx, ny);
       return;
     }
@@ -308,10 +480,17 @@
   }
 
   function onMove(e) {
-    if (!drag) return;
+    if (!drag) {
+      updateCursor(e);
+      return;
+    }
     const info = pageFromEvent(e);
     if (!info || info.page !== drag.page) return;
     drag.moved = true;
+    if (drag.kind === 'resize') {
+      resizeAnnot(drag, info.nx, info.ny);
+      return;
+    }
     if (drag.kind === 'move') {
       const dx = info.nx - drag.startX;
       const dy = info.ny - drag.startY;
@@ -338,6 +517,14 @@
     drag = null;
     clearRubber();
     const page = d.page;
+    if (d.kind === 'resize') {
+      if (d.moved) {
+        S().dirty = true;
+        App.history.push();
+      }
+      if (page.el) page.el.style.cursor = '';
+      return;
+    }
     if (d.kind === 'move') {
       if (d.moved) {
         S().dirty = true;
@@ -586,7 +773,7 @@
         const boxW = Math.max(60, Math.min(420, w * 0.55));
         const lines = text.split('\n');
         const estH = lines.length * S().opts.fontSize * 1.35 + 4;
-        App.annots.add(page.id, {
+        const annot = App.annots.add(page.id, {
           type: 'text',
           x: nx,
           y: ny,
@@ -597,6 +784,11 @@
           color: S().opts.textColor,
           align: 'left',
         });
+        fitTextHeight(page, annot);
+        // 建好即选中：虚线框 + 手柄出现，可直接拖动/缩放
+        S().selected = { pageId: page.id, annotId: annot.id };
+        App.viewer.refreshOverlays();
+        App.ui.toast('已添加文本框：拖动移动，拖手柄缩放');
       },
     });
   }
@@ -650,6 +842,10 @@
     moveAnnot,
     wrapLines,
     openTextCreator,
+    fitTextHeight,
+    handlePoints,
+    isBoxAnnot,
+    HANDLES,
     FONT_STACK,
   };
 })();

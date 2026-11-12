@@ -208,6 +208,7 @@
         c.font = `${a.size * S().zoom}px ${App.annotate.FONT_STACK}`;
         const tw = c.measureText(text).width;
         a.w = Math.max(a.w, Math.min(0.98, (tw + 8) / W));
+        App.annotate.fitTextHeight(page, a);
         S().dirty = true;
         App.history.push();
         App.viewer.refreshOverlays();

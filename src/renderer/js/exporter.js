@@ -280,5 +280,34 @@
     });
   }
 
+  /** 按字体实际宽度折行（导出时用，和画布上的换行规则保持一致） */
+  function wrapPdf(font, text, size, maxWidth) {
+    const out = [];
+    for (const para of String(text).split('\n')) {
+      if (!para) {
+        out.push('');
+        continue;
+      }
+      let line = '';
+      for (const ch of para) {
+        const test = line + ch;
+        let w = 0;
+        try {
+          w = font.widthOfTextAtSize(test, size);
+        } catch {
+          w = test.length * size * 0.6;
+        }
+        if (w > maxWidth && line) {
+          out.push(line);
+          line = ch;
+        } else {
+          line = test;
+        }
+      }
+      out.push(line);
+    }
+    return out;
+  }
+
   App.exporter = { build };
 })();

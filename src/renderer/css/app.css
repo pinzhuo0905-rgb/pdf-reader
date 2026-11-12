@@ -1102,7 +1102,8 @@ body {
   flex-direction: column;
   gap: 6px;
   background: var(--panel);
-  border: 1px solid var(--accent);
+  /* 虚线框：和页面上文本框的虚线保持一致，明确「这是一个可调整的框」 */
+  border: 1.5px dashed var(--accent);
   border-radius: 6px;
   box-shadow: var(--shadow-menu);
   padding: 6px;

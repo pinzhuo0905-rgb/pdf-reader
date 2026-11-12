@@ -525,16 +525,44 @@
       ctx.restore();
     }
 
-    // 选中框
+    // 文本框：始终显示淡虚线边框，让人一眼看出「这里是一个可拖动的框」
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,114,201,0.32)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    for (const a of list) {
+      if (a.type !== 'text' && a.type !== 'textedit') continue;
+      const isSel = S().selected && S().selected.pageId === p.id && S().selected.annotId === a.id;
+      if (isSel) continue; // 选中的由下面统一画（更醒目 + 手柄）
+      ctx.strokeRect(a.x * w, a.y * h, a.w * w, a.h * h);
+    }
+    ctx.restore();
+
+    // 选中框 + 缩放手柄
     if (S().selected && S().selected.pageId === p.id) {
       const a = App.annots.find(p.id, S().selected.annotId);
       if (a) {
         const b = App.annotate.bbox(a);
         ctx.save();
         ctx.strokeStyle = '#0072c9';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 3]);
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 3]);
         ctx.strokeRect(b.x * w, b.y * h, b.w * w, b.h * h);
+        if (App.annotate.isBoxAnnot(a)) {
+          const pts = App.annotate.handlePoints(a);
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#ffffff';
+          ctx.strokeStyle = '#0072c9';
+          ctx.lineWidth = 1.2;
+          for (const k of App.annotate.HANDLES) {
+            const cx = pts[k][0] * w;
+            const cy = pts[k][1] * h;
+            ctx.beginPath();
+            ctx.rect(cx - 3.5, cy - 3.5, 7, 7);
+            ctx.fill();
+            ctx.stroke();
+          }
+        }
         ctx.restore();
       }
     }
