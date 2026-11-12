@@ -23,6 +23,7 @@
     $('btn-draw').onclick = () => setTool(S().tool === 'draw' ? 'select' : 'draw');
     $('btn-draw-caret').onclick = (e) => openPenMenu(e.currentTarget);
     $('btn-eraser').onclick = () => setTool(S().tool === 'eraser' ? 'select' : 'eraser');
+    $('btn-eraser-caret').onclick = (e) => openEraserMenu(e.currentTarget);
     $('btn-textbox').onclick = () => setTool(S().tool === 'textbox' ? 'select' : 'textbox');
     $('btn-read').onclick = toggleReadAloud;
     $('btn-ocr').onclick = () => App.ocr.toggle();
@@ -181,6 +182,7 @@
     Object.entries(TOOL_BUTTONS).forEach(([k, id]) => $(id).classList.toggle('active', k === st.tool));
     $('grp-highlight').classList.toggle('active', st.tool === 'highlight');
     $('grp-draw').classList.toggle('active', st.tool === 'draw');
+    $('grp-eraser').classList.toggle('active', st.tool === 'eraser');
 
     const map = {
       select: 'eb-select',
@@ -255,6 +257,7 @@
     const state = S();
     state.tool = tool;
     state.selected = null;
+    if (App.annotate.hideEraserCursor) App.annotate.hideEraserCursor();
     $('main').dataset.tool = tool;
 
     Object.entries(TOOL_BUTTONS).forEach(([t, id]) => {
@@ -262,6 +265,7 @@
     });
     $('grp-highlight').classList.toggle('active', tool === 'highlight');
     $('grp-draw').classList.toggle('active', tool === 'draw');
+    $('grp-eraser').classList.toggle('active', tool === 'eraser');
 
     // 编辑条按钮
     const map = {
@@ -309,6 +313,7 @@
     Object.entries(TOOL_BUTTONS).forEach(([t, id]) => $(id).classList.toggle('active', t === tool));
     $('grp-highlight').classList.remove('active');
     $('grp-draw').classList.remove('active');
+    $('grp-eraser').classList.remove('active');
     ['eb-select', 'eb-textedit', 'eb-textbox', 'eb-image', 'eb-shape', 'eb-whiteout'].forEach((id) =>
       $(id).classList.remove('active')
     );
@@ -474,6 +479,29 @@
         setTool('draw');
       }
     });
+  }
+
+  /** 橡皮大小：和「绘制」一样用下拉菜单，改完直接切到橡皮 */
+  function openEraserMenu(anchor) {
+    const o = S().opts;
+    const menu = showMenu(
+      anchor,
+      `<div class="menu-title">橡皮大小</div>
+       <div style="display:flex;align-items:center;gap:8px;padding:0 12px 8px">
+         <input id="eraser-range" type="range" min="4" max="48" step="1" value="${o.eraserRadius}" style="flex:1;accent-color:var(--accent)"/>
+         <span id="eraser-val" style="font-size:12px;min-width:38px;text-align:right">${o.eraserRadius}px</span>
+       </div>
+       <div style="padding:0 12px 10px;font-size:12px;color:var(--text-dim);line-height:1.5">
+         按住拖动，擦掉圆点下方的涂鸦
+       </div>`
+    );
+    const r = menu.querySelector('#eraser-range');
+    const v = menu.querySelector('#eraser-val');
+    r.oninput = () => {
+      o.eraserRadius = Number(r.value);
+      v.textContent = r.value + 'px';
+    };
+    setTool('eraser');
   }
 
   function openMoreMenu(anchor) {

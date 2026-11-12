@@ -283,6 +283,135 @@
     if (a.h < need) a.h = Math.min(1 - a.y, need);
   }
 
+  /* ------------------------------ 橡皮擦 ------------------------------ */
+  let eraserSeq = 0;
+  const genInkId = () => 'k' + Date.now().toString(36) + (eraserSeq++).toString(36);
+
+  let eraserCursor = null;
+  function ensureEraserCursor() {
+    if (eraserCursor && eraserCursor.isConnected) return eraserCursor;
+    eraserCursor = document.createElement('div');
+    eraserCursor.className = 'eraser-cursor hidden';
+    (document.getElementById('app') || document.body).appendChild(eraserCursor);
+    return eraserCursor;
+  }
+  function showEraserCursor(x, y) {
+    const c = ensureEraserCursor();
+    const r = Math.max(2, S().opts.eraserRadius || 14);
+    c.style.width = r * 2 + 'px';
+    c.style.height = r * 2 + 'px';
+    c.style.left = x + 'px';
+    c.style.top = y + 'px';
+    c.classList.remove('hidden');
+  }
+  function moveEraserCursor(x, y) {
+    if (eraserCursor && !eraserCursor.classList.contains('hidden')) {
+      eraserCursor.style.left = x + 'px';
+      eraserCursor.style.top = y + 'px';
+    } else {
+      showEraserCursor(x, y);
+    }
+  }
+  function hideEraserCursor() {
+    if (eraserCursor) eraserCursor.classList.add('hidden');
+  }
+
+  /**
+   * 把一条涂鸦按圆点裁断：圆内的点丢掉，剩下的连续点各自成段。
+   * 返回 null 表示完全没碰到；返回数组表示裁断后的新标注（可能为空数组 = 整条被擦掉）。
+   */
+  function splitInk(a, cx, cy, r, W, H) {
+    const pts = a.points || [];
+    if (!pts.length) return null;
+    // 先用包围盒快速排除
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of pts) {
+      const px = p.x * W;
+      const py = p.y * H;
+      if (px < minX) minX = px;
+      if (px > maxX) maxX = px;
+      if (py < minY) minY = py;
+      if (py > maxY) maxY = py;
+    }
+    if (cx + r < minX || cx - r > maxX || cy + r < minY || cy - r > maxY) return null;
+
+    const r2 = r * r;
+    const segs = [];
+    let cur = [];
+    let hit = false;
+    for (const p of pts) {
+      const dx = p.x * W - cx;
+      const dy = p.y * H - cy;
+      if (dx * dx + dy * dy <= r2) {
+        hit = true;
+        if (cur.length) {
+          segs.push(cur);
+          cur = [];
+        }
+      } else {
+        cur.push(p);
+      }
+    }
+    if (cur.length) segs.push(cur);
+    if (!hit) return null;
+    return segs.map((seg) => ({ ...a, id: genInkId(), points: seg }));
+  }
+
+  /**
+   * 在 (nx, ny) 处用半径 rPx 的圆点擦一下：
+   * - 涂鸦（ink）只擦掉圆内的点，剩下的断成多段；
+   * - 其它对象（高亮/文本框/形状/图片/涂改）圆点落在其范围内时整体删除。
+   * 返回是否有改动。
+   */
+  function eraseAt(page, nx, ny, rPx) {
+    const zoom = S().zoom;
+    const W = page.wPt * zoom;
+    const H = page.hPt * zoom;
+    const cx = nx * W;
+    const cy = ny * H;
+    const r = Math.max(2, rPx || S().opts.eraserRadius || 14);
+    const list = App.annots.get(page.id);
+    let changed = false;
+
+    // 1) 涂鸦：按点裁断
+    const out = [];
+    for (const a of list) {
+      if (a.type !== 'ink') {
+        out.push(a);
+        continue;
+      }
+      const segs = splitInk(a, cx, cy, r, W, H);
+      if (!segs) {
+        out.push(a);
+        continue;
+      }
+      changed = true;
+      for (const s of segs) out.push(s);
+    }
+    if (changed) {
+      list.length = 0;
+      for (const a of out) list.push(a);
+    }
+
+    // 2) 其它对象：圆点中心落在范围内才整体删除（只删最上面一个）
+    for (let i = list.length - 1; i >= 0; i--) {
+      const a = list[i];
+      if (a.type === 'ink') continue;
+      const b = bbox(a);
+      if (cx >= b.x * W && cx <= (b.x + b.w) * W && cy >= b.y * H && cy <= (b.y + b.h) * H) {
+        list.splice(i, 1);
+        changed = true;
+        break;
+      }
+    }
+
+    if (changed) App.viewer.refreshOverlays();
+    return changed;
+  }
+
   /** 拖动缩放手柄 */
   function resizeAnnot(d, nx, ny) {
     const a = d.annot;
@@ -333,9 +462,15 @@
   /** 鼠标悬停时给出手柄/移动光标，便于发现可拖拽 */
   function updateCursor(e) {
     const info = pageFromEvent(e);
+    const tool = S().tool;
+    if (tool === 'eraser') {
+      if (info) showEraserCursor(e.clientX, e.clientY);
+      else hideEraserCursor();
+      return;
+    }
+    hideEraserCursor();
     if (!info) return;
     const page = info.page;
-    const tool = S().tool;
     if (tool !== 'select' && tool !== 'textbox') {
       if (page.el.style.cursor) page.el.style.cursor = '';
       return;
@@ -357,6 +492,7 @@
     container.addEventListener('pointerdown', onDown);
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    container.addEventListener('pointerleave', hideEraserCursor);
     container.addEventListener('contextmenu', onContextMenu);
     container.addEventListener('dblclick', onDblClick);
   }
@@ -423,11 +559,9 @@
     }
 
     if (tool === 'eraser') {
-      const a = hitTest(page, nx, ny);
-      if (a) {
-        App.annots.remove(page.id, a.id);
-        App.ui.toast('已删除标注');
-      }
+      e.preventDefault();
+      drag = { kind: 'erase', page, erased: false };
+      drag.erased = eraseAt(page, nx, ny) || drag.erased;
       return;
     }
 
@@ -487,6 +621,11 @@
     const info = pageFromEvent(e);
     if (!info || info.page !== drag.page) return;
     drag.moved = true;
+    if (drag.kind === 'erase') {
+      moveEraserCursor(e.clientX, e.clientY);
+      if (eraseAt(drag.page, info.nx, info.ny)) drag.erased = true;
+      return;
+    }
     if (drag.kind === 'resize') {
       resizeAnnot(drag, info.nx, info.ny);
       return;
@@ -517,6 +656,14 @@
     drag = null;
     clearRubber();
     const page = d.page;
+    if (d.kind === 'erase') {
+      if (d.erased) {
+        S().dirty = true;
+        App.history.push();
+        App.ui.setTitle();
+      }
+      return;
+    }
     if (d.kind === 'resize') {
       if (d.moved) {
         S().dirty = true;
@@ -843,6 +990,7 @@
     wrapLines,
     openTextCreator,
     fitTextHeight,
+    hideEraserCursor,
     handlePoints,
     isBoxAnnot,
     HANDLES,

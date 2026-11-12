@@ -48,6 +48,7 @@
         shapeKind: 'rect',
         shapeColor: COLORS.shape[0],
         shapeWidth: 2,
+        eraserRadius: 14, // 橡皮圆点半径（屏幕 px）
       },
       selected: null, // {pageId, annotId}
       /* 其它 */

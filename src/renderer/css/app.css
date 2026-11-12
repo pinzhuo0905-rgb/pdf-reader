@@ -602,8 +602,20 @@ body {
   cursor: crosshair;
 }
 
+/* 橡皮：隐藏系统指针，改用自绘圆点 */
 .main[data-tool='eraser'] .page {
-  cursor: cell;
+  cursor: none;
+}
+
+.eraser-cursor {
+  position: fixed;
+  z-index: 70;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 0, 0, 0.7);
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7);
+  pointer-events: none;
 }
 
 /* 文本层在非选择工具下不拦截事件，便于绘制 */

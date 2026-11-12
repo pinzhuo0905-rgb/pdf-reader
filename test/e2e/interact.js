@@ -65,15 +65,20 @@
     await sleep(200);
     log.text = App.annots.get(page.id).filter((a) => a.type === 'text').length;
 
-    // 5) 橡皮擦（点在画笔线的中间节点上）
+    // 5) 橡皮擦：点一下只擦掉圆点下方的点，笔画应断成两段而不是整条消失
     App.ui.setTool('eraser');
     await sleep(150);
     const inkAnnot = App.annots.get(page.id).find((a) => a.type === 'ink');
     const mid = inkAnnot.points[Math.floor(inkAnnot.points.length / 2)];
     const r2 = page.el.getBoundingClientRect();
     ev('pointerdown', r2.left + r2.width * mid.x, r2.top + r2.height * mid.y);
-    await sleep(200);
-    log.inkAfterErase = App.annots.get(page.id).filter((a) => a.type === 'ink').length;
+    await sleep(120);
+    ev('pointerup', r2.left + r2.width * mid.x, r2.top + r2.height * mid.y);
+    await sleep(250);
+    const inksAfter = App.annots.get(page.id).filter((a) => a.type === 'ink');
+    log.inkAfterErase = inksAfter.length;
+    log.inkPointsAfterErase = inksAfter.reduce((n, a) => n + a.points.length, 0);
+    log.inkSplit = inksAfter.length >= 2;
 
     // 6) 撤销 / 重做
     const before = App.annots.get(page.id).length;
