@@ -56,10 +56,18 @@
       ctrlX: Math.round(ctrl.x),
     });
 
+    // 2.5) 只有一个标签时：标签兼作标题栏（拖动即移动窗口），不进入拖拽逻辑
+    const singleTab = document.querySelector('#tabstrip .tab');
+    assert('singleTabIsDragRegion', getComputedStyle(singleTab).webkitAppRegion === 'drag');
+    assert('singleClass', document.getElementById('tabstrip').classList.contains('single'));
+    assert('singleTabCloseClickable', getComputedStyle(singleTab.querySelector('.tab-close')).webkitAppRegion === 'no-drag');
+
     // 3) 加到 12 个标签：均分收窄、无重叠、不溢出到按钮
     while (App.tabs.list.length < 12) App.tabs.createBlank(false);
     await sleep(500);
     g = geo();
+    assert('multiTabNotDragRegion', getComputedStyle(document.querySelector('#tabstrip .tab')).webkitAppRegion !== 'drag');
+    assert('singleClassCleared', !document.getElementById('tabstrip').classList.contains('single'));
     assert('twelveNoOverlap', g.overlaps.length === 0, g.overlaps);
     assert('twelveSameWidth', new Set(g.tabs.map((t) => t.w)).size === 1, g.tabs.map((t) => t.w));
     assert('twelveFits', g.strip.scrollWidth <= g.strip.clientWidth + 2, {

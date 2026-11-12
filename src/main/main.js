@@ -165,6 +165,7 @@ function createWindow(opts = {}) {
 
   win.once('ready-to-show', () => {
     if (!HEADLESS) win.show();
+    broadcastWindowCount();
     if (win.__pendingOpen) {
       win.webContents.send('open-file', win.__pendingOpen);
       win.__pendingOpen = null;
@@ -213,6 +214,7 @@ function createWindow(opts = {}) {
   win.on('closed', () => {
     windows.delete(win);
     if (mainWindow === win) mainWindow = [...windows].pop() || null;
+    broadcastWindowCount();
   });
 
   // 有未保存修改时拦截关闭
@@ -224,6 +226,13 @@ function createWindow(opts = {}) {
   });
 
   return win;
+}
+
+/** 把当前窗口数量告诉所有窗口（渲染层据此决定单标签的拖动行为） */
+function broadcastWindowCount() {
+  for (const w of windows) {
+    if (!w.isDestroyed()) w.webContents.send('windows:count', windows.size);
+  }
 }
 
 /** 开发期自检：跑测试脚本 / 截图后退出（打包后不生效） */
@@ -280,11 +289,29 @@ ipcMain.handle('app:allow-close', (e) => {
 });
 
 /** 标签页被拖出标签条：在鼠标位置开一个新窗口，并打开同一个文件 */
-ipcMain.handle('tab:detach', (e, payload) => {
-  if (!payload || !payload.path) return false;
+ipcMain.handle('tab:detach', async (e, payload) => {
+  if (!payload || !payload.path) return { merged: false };
   const src = BrowserWindow.fromWebContents(e.sender);
-  const sb = src ? src.getBounds() : { width: 1280, height: 860 };
   const pt = screen.getCursorScreenPoint();
+
+  // 1) 松手落在另一个窗口上 -> 把标签合并过去（从别的窗口拖回来就是这条路径）
+  const target = [...windows].find((w) => {
+    if (!w || w === src || w.isDestroyed() || !w.isVisible()) return false;
+    const b = w.getBounds();
+    return pt.x >= b.x && pt.x <= b.x + b.width && pt.y >= b.y && pt.y <= b.y + b.height;
+  });
+  if (target) {
+    if (target.isMinimized()) target.restore();
+    target.webContents.send('open-file', { path: payload.path, page: payload.page || 0 });
+    target.focus();
+    return { merged: true };
+  }
+
+  // 2) 只有一个标签的窗口拖到空白处：不新建窗口（否则会多出一个只含同一文件的窗口）
+  if (payload.only) return { merged: false, skipped: true };
+
+  // 3) 否则在鼠标位置开一个新窗口
+  const sb = src && !src.isDestroyed() ? src.getBounds() : { width: 1280, height: 860 };
   const area = screen.getDisplayNearestPoint(pt).workArea;
   const width = Math.min(sb.width, area.width);
   const height = Math.min(sb.height, area.height);
@@ -295,7 +322,7 @@ ipcMain.handle('tab:detach', (e, payload) => {
     page: payload.page || 0,
     bounds: { x, y, width, height },
   });
-  return true;
+  return { merged: false };
 });
 
 app.on('second-instance', (_e, argv) => {
@@ -530,6 +557,8 @@ ipcMain.handle('window:close', (e) => {
   if (win) win.close(); // 走 close 拦截：有未保存修改时由渲染层确认
   return true;
 });
+
+ipcMain.handle('window:count', () => windows.size);
 
 ipcMain.handle('window:isMaximized', (e) => {
   const win = BrowserWindow.fromWebContents(e.sender);

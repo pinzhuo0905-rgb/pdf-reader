@@ -10,6 +10,7 @@
   };
 
   let drag = null; // { id, el, startX, startY, moved, ghost }
+  let windowCount = 1; // 当前应用开了几个窗口（单标签时用来区分「移动窗口」和「合并」）
   let pendingActivate = null;
 
   const label = (t) => (t.state && t.state.fileName) || '新标签页';
@@ -31,6 +32,19 @@
     window.addEventListener('pointermove', onDragMove);
     window.addEventListener('pointerup', onDragUp);
     window.addEventListener('resize', () => fitTabs());
+
+    // 窗口数量：只有 1 个窗口时，单标签拖动 = 移动窗口；多窗口时才允许拖出去合并
+    window.api.onWindowCount((n) => {
+      windowCount = n;
+      fitTabs();
+    });
+    window.api
+      .windowCount()
+      .then((n) => {
+        windowCount = n;
+        fitTabs();
+      })
+      .catch(() => {});
 
     // 文件关联 / 从其它窗口拖出的标签页
     window.api.onOpenFile((payload) => {
@@ -280,6 +294,8 @@
     w = Math.max(72, Math.min(208, w));
     strip.style.setProperty('--tab-w', w + 'px');
     strip.classList.toggle('narrow', w < 122);
+    // 只有一个标签、且只有一个窗口时，标签兼作标题栏：拖动它移动窗口
+    strip.classList.toggle('single', n === 1 && windowCount <= 1);
   }
 
   /** 让当前标签保持在可见区域内 */
@@ -349,6 +365,8 @@
       return;
     }
     if (e.button !== 0) return;
+    // 只有一个标签、且只有一个窗口：标签是拖动区，拖动即移动窗口，不进入标签拖拽
+    if (tabs.list.length === 1 && windowCount <= 1) return;
     if (tabs.activeId !== id) activate(id);
 
     drag = { id, el: tabEl, startX: e.clientX, startY: e.clientY, moved: false, ghost: null };
@@ -444,22 +462,62 @@
     detach(t, e.clientX, e.clientY);
   }
 
-  /** 拖出标签条：交给主进程开一个新窗口，并把该文档搬过去 */
-  function detach(t, x, y) {
+  /** 只把标签页从列表里移除，不补空白页（用于「搬到别的窗口」） */
+  function removeTab(id) {
+    const t = find(id);
+    if (!t) return false;
+    const i = tabs.list.indexOf(t);
+    tabs.list.splice(i, 1);
+    App.viewer.destroyView(t);
+    if (tabs.activeId === id) {
+      const nextTab = tabs.list[Math.min(i, tabs.list.length - 1)];
+      if (nextTab) activate(nextTab.id);
+      else tabs.activeId = null;
+    } else {
+      paintStrip();
+    }
+    return true;
+  }
+
+  /**
+   * 拖出标签条：
+   * - 松手在另一个窗口上 -> 合并过去（"放回去"）
+   * - 否则 -> 开一个新窗口
+   * 源窗口因此变空时直接关窗，不再补空白页。
+   */
+  async function detach(t, x, y) {
     const st = t.state;
     if (!st.filePath) {
-      App.ui.toast('该标签页还没有对应的文件，无法拖出为独立窗口');
-      render();
+      App.ui.toast('该标签页还没有对应的文件，无法拖出');
+      paintStrip();
       return;
     }
     if (st.dirty) {
-      App.ui.toast('请先保存该标签页，再拖出为独立窗口');
-      render();
+      App.ui.toast('请先保存该标签页，再拖出');
+      paintStrip();
       return;
     }
-    window.api.detachTab({ path: st.filePath, page: st.currentPage + 1, x, y });
-    close(t.id, true);
-    App.ui.toast('已在新窗口中打开');
+    const only = tabs.list.length === 1;
+    let res = null;
+    try {
+      res = await window.api.detachTab({ path: st.filePath, page: st.currentPage + 1, x, y, only });
+    } catch (e) {
+      App.ui.toast('移动失败：' + (e.message || e));
+      paintStrip();
+      return;
+    }
+    if (res && res.skipped) {
+      App.ui.toast('松手位置没有其他窗口');
+      paintStrip();
+      return;
+    }
+    removeTab(t.id);
+    if (!tabs.list.length) {
+      // 源窗口已空：直接关闭（有未保存修改的标签页已在上面拦掉）
+      window.api.allowClose();
+      return;
+    }
+    App.ui.toast(res && res.merged ? '已移动到另一个窗口' : '已在新窗口中打开');
   }
 
   /* ============================== 标签右键菜单 ============================== */

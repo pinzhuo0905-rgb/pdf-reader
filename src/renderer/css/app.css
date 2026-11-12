@@ -1467,6 +1467,15 @@ body {
   opacity: 1;
 }
 
+/* 只有一个标签时：标签本身当作标题栏，拖动它移动窗口（而不是拖出新窗口） */
+.tabstrip.single .tab {
+  -webkit-app-region: drag;
+}
+
+.tabstrip.single .tab .tab-close {
+  -webkit-app-region: no-drag;
+}
+
 /* 标签很窄时（多标签）隐藏关闭按钮，避免挤成一团 */
 .tabstrip.narrow .tab-close {
   display: none;

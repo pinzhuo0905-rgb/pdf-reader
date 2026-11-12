@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld('api', {
   isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
   onMaximized: (cb) => ipcRenderer.on('window:maximized', (_e, v) => cb(v)),
   headless: !!(process.env.PDFREADER_TEST || process.env.PDFREADER_SHOT),
+  windowCount: () => ipcRenderer.invoke('window:count'),
+  onWindowCount: (cb) => ipcRenderer.on('windows:count', (_e, n) => cb(n)),
   isFullscreen: () => ipcRenderer.invoke('window:isFullscreen'),
   printPages: (payload) => ipcRenderer.invoke('print:pages', payload),
   loadCjkFont: () => ipcRenderer.invoke('font:load'),
