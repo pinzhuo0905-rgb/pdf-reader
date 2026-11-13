@@ -41,6 +41,7 @@
     "dist": "electron-builder --win nsis",
     "icon:edge": "node scripts/extract-edge-icon.mjs",
     "shots": "node scripts/make-screenshots.mjs",
+    "set-default": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/set-default-pdf.ps1",
     "test:interact": "node scripts/run-e2e.mjs test/e2e/interact.js --delay 9000",
     "test:ocr": "node scripts/run-e2e.mjs test/e2e/ocr.js --delay 16000",
     "test:tabs": "node scripts/run-e2e.mjs test/e2e/tabs.js --delay 14000",
