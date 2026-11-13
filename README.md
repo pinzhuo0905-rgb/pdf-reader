@@ -4,273 +4,308 @@
 
 # PDF Reader
 
-**界面纯净 · 功能丰富**
+**Clean UI · Serious features**
 
-复刻 Microsoft Edge 内置 PDF 阅读器的观感，却把**多标签页**、标注、改字、页面管理、离线 OCR 全部装了进去。
+[English](README.md) · [简体中文](README.zh-CN.md)
 
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078D4?style=flat-square)](#安装)
+A lightweight PDF reader that looks and feels like Microsoft Edge's built-in viewer, but ships with
+**tabs**, annotation, in-place text editing, page management and fully offline OCR.
+
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078D4?style=flat-square)](#install)
 [![License](https://img.shields.io/badge/license-MIT-2ea44f?style=flat-square)](LICENSE)
 [![Electron](https://img.shields.io/badge/Electron-33-47848F?style=flat-square)](https://www.electronjs.org/)
 [![PDF.js](https://img.shields.io/badge/PDF.js-3.11-orange?style=flat-square)](https://mozilla.github.io/pdf.js/)
-[![OCR](https://img.shields.io/badge/OCR-offline%20%C2%B7%20%E4%B8%AD%E8%8B%B1%E5%8F%8C%E8%AF%AD-0a7c42?style=flat-square)](#ocr-文字识别)
+[![OCR](https://img.shields.io/badge/OCR-offline%20%C2%B7%20zh%2Ben-0a7c42?style=flat-square)](#ocr)
 
 </div>
 
-![主界面](docs/screenshots/01-reader.png)
+![Main window](docs/screenshots/01-reader.png)
 
-## 为什么又造一个 PDF 阅读器？
+## Why another PDF reader?
 
-市面上的选择基本分两类：
+The options out there fall into two camps:
 
-- **浏览器内置阅读器**（Edge / Chrome）：界面干净、打开即读，但除了画两笔什么都做不了；
-- **「全能」PDF 工具**：功能一堆，代价是启动页、会员弹窗、右侧推荐、云同步账号，以及动辄 500 MB 的体积。
+- **Browser built-ins** (Edge / Chrome): clean, instant, but you cannot do anything beyond scribbling;
+- **"All-in-one" PDF suites**: everything included — plus a start screen, membership pop-ups, sidebar
+  recommendations, a cloud account, and a 500 MB download.
 
-**这个项目想证明两件事可以同时成立**：界面只保留你真正需要的那一层工具栏，而功能一个都不少。
-零广告、零账号、零联网——断网也能用，OCR 也在本地跑。
+**This project argues you can have both**: one row of toolbar buttons you actually need, and none of the
+features missing. No ads, no account, no network — it works offline, and even OCR runs locally.
 
-## 核心卖点
+## Highlights
 
-| 🫧 界面纯净 | 🧰 功能丰富 |
+| 🫧 Clean UI | 🧰 Serious features |
 | --- | --- |
-| 工具栏与 Edge PDF 阅读器同款布局：一层、48px、无二级菜单迷宫 | 高亮 / 画笔 / 橡皮 / 文本框 / 形状 / 图片 / 涂改，全部能写回 PDF |
-| 无启动页、无广告、无推荐、无「升级 Pro」 | 点击原文即可**原地改字**（不弹框，直接写在页面上），中文字体子集自动嵌入 |
-| 无账号、无云同步、无任何网络请求 | 页面旋转 / 删除 / 插入，保存时真正重排 PDF |
-| 深色 / 浅色主题都保持克制，不抢内容 | 自研 **离线 OCR**，中英双语自动切换，扫描页变可复制文本 |
-| 打开即读：一个 exe，不装运行库 | 20+ 快捷键、右键菜单、缩略图、全文搜索、打印 |
-| 中英双语界面一键切换（中文宋体 / 英文 Times New Roman） | **双页视图**、Ctrl+滚轮平滑缩放、缩放滑块 |
-| 标签条只有 38px，不挤占阅读区 | **浏览器式多标签页**：拖拽排序、拖出成独立窗口、状态各自独立 |
-| 侧栏按需展开，默认不占地方 | **目录侧栏**：PDF 书签 + 页面缩略图，当前页高亮 |
+| Toolbar laid out like Edge's PDF viewer: one row, 48px, no nested menu maze | Highlight / pen / eraser / text box / shapes / images / whiteout — all written back into the PDF |
+| No start screen, no ads, no recommendations, no "upgrade to Pro" | Click the original text to **edit it in place** (no dialog), with automatic font subsetting |
+| No account, no cloud sync, no network requests at all | Rotate / delete / insert pages, with the PDF genuinely rebuilt on save |
+| Dark and light themes stay restrained and never fight the content | Home-grown **offline OCR**, automatic Chinese/English switching, scanned pages become selectable text |
+| Opens instantly: one exe, no runtime to install | 20+ shortcuts, context menus, thumbnails, full-text search, printing |
+| One-click Chinese/English UI (SimSun for Chinese, Times New Roman for English) | **Two-page view**, smooth Ctrl+wheel zoom, zoom slider |
+| The tab strip is only 38px tall | **Browser-style tabs**: drag to reorder, tear out into a separate window, independent state |
+| Sidebar appears on demand and takes no space otherwise | **Contents sidebar**: PDF bookmarks + page thumbnails, current page outlined |
 
-## 截图
+## Screenshots
 
-**标注与内容编辑** —— 同一个界面里，读完就能改：
+**Annotate and edit content** — read and fix in the same window:
 
-![标注与编辑](docs/screenshots/02-annotate.png)
+![Annotate and edit](docs/screenshots/02-annotate.png)
 
-**离线 OCR** —— 扫描件也能选中、复制、搜索：
+**Offline OCR** — scanned documents become selectable, copyable and searchable:
 
 ![OCR](docs/screenshots/03-ocr.png)
 
-**全文搜索 / 深色主题** —— 夜里读论文不刺眼：
+**Full-text search / dark theme** — easy on the eyes at night:
 
-![搜索与深色主题](docs/screenshots/04-search.png)
+![Search and dark theme](docs/screenshots/04-search.png)
 
-**多标签页 + 目录侧栏** —— 同时开着讲义和论文，左侧点书签直接跳章：
+**Tabs + contents sidebar** — keep the handout and the paper open, jump chapters from the outline:
 
-![多标签页与目录](docs/screenshots/05-tabs.png)
+![Tabs and contents](docs/screenshots/05-tabs.png)
 
-**双页视图** —— 讲义对照排版时一屏看两页：
+**Two-page view** — compare two pages side by side:
 
-![双页视图](docs/screenshots/09-twoup.png)
+![Two-page view](docs/screenshots/09-twoup.png)
 
-**English UI** —— 设置里切换语言，英文界面用 Times New Roman：
+**English UI** — switch language in Settings; English uses Times New Roman:
 
-![英文界面](docs/screenshots/10-en.png)
+![English UI](docs/screenshots/10-en.png)
 
-**页内原地编辑** —— 点原文直接在页面上改，虚线框即编辑区：
+**In-place text editing** — click the original text and type; the dashed box is the edit area:
 
-![原地编辑](docs/screenshots/11-inline-edit.png)
+![In-place editing](docs/screenshots/11-inline-edit.png)
 
-**把标签页拖出成独立窗口** —— 松手即在新窗口继续读（虚线框为落点提示）：
+**Tear a tab out into its own window** — keep reading in a new window (dashed box marks the drop target):
 
-![拖出标签页](docs/screenshots/06-tab-drag.png)
+![Detach a tab](docs/screenshots/06-tab-drag.png)
 
-## 功能列表
+## Features
 
-### 阅读
+### Reading
 
-- 连续滚动、双页视图、适应宽度 / 适应页面、15%–500% 缩放
-- 页码跳转、旋转页面、全屏
-- **无边框标题栏**：最小化 / 最大化 / 关闭与标签同一行，拖动标签条即可移动窗口，不多占一像素
-- **多标签页**：同时打开多个 PDF，标签可拖拽排序、可拖出为独立窗口（见[交互说明](docs/tabs-and-sidebar.md)）
-- **目录侧栏**：左上角 `☰` 展开，含 PDF 书签（大纲）与页面缩略图，当前页蓝色描边
-- **文本选择与复制**：拖选、双击选词、`Ctrl+A` 全选、右键复制
-- 全文搜索：命中高亮、当前命中橙色标记、上一个 / 下一个、命中计数
-- 打印、文档属性
-- 拖放打开、`.pdf` 双击打开、单实例多文件切换
-- 浅色 / 深色 / 跟随系统主题
+- Continuous scrolling, two-page view, fit width / fit page, 15%–500% zoom
+- Page number jump, page rotation, full screen
+- **Frameless title bar**: minimise / maximise / close share the tab row, drag the tab strip to move the
+  window — not a single extra pixel
+- **Tabs**: open several PDFs at once, drag to reorder, tear out into a separate window
+  (see [interaction notes](docs/tabs-and-sidebar.md))
+- **Contents sidebar**: `☰` in the top-left opens PDF bookmarks (outline) and page thumbnails, with the
+  current page outlined in blue
+- **Text selection and copy**: drag-select, double-click a word, `Ctrl+A`, right-click copy
+- Full-text search: highlighted hits, orange marker on the current hit, previous/next, match counter
+- Printing, document properties
+- Open by drag & drop, by double-clicking a `.pdf`, single instance with multiple files
+- Light / dark / follow-system themes
 
-### 标注（写入 PDF 文件）
+### Annotation (written into the PDF file)
 
-| 工具 | 说明 |
+| Tool | Notes |
 | --- | --- |
-| 高亮 | 拖动时按**文字行吸附**，不会糊成一整块；6 种颜色 |
-| 画笔 | 6 种颜色 + 粗细可调，贝塞尔平滑 |
-| 橡皮擦 | **圆形笔尖，半径 4–48px 可调**（按钮右侧箭头）；按住拖动只擦掉圆点下方的涂鸦，笔画会断成多段；其它对象（高亮/文本框/形状/图片/涂改）圆点落上去时整体删除 |
-| 文本框 | 就地输入，双击可再次编辑；**虚线框，拖动移动、拖 8 个手柄缩放**，框高自动跟随文字 |
-| 形状 | 矩形 / 椭圆 / 直线 / 箭头 |
-| 插入图片 | PNG / JPG，自动适配页面比例 |
-| 涂改遮盖 | 拖框覆盖，用于遮盖敏感信息 |
-| 撤销 / 重做 | 80 步快照，覆盖标注与页面操作 |
+| Highlight | Snaps to **text lines** while dragging instead of smearing into one block; 6 colours |
+| Pen | 6 colours plus adjustable width, Bézier-smoothed |
+| Eraser | **Round tip, radius 4–48px** (arrow next to the button); dragging erases only the ink under the dot and splits strokes into segments; other objects (highlight / text box / shape / image / whiteout) are removed as a whole when the dot lands on them |
+| Text box | Type in place, double-click to edit again; **dashed box, drag to move, 8 handles to resize**, height follows the text |
+| Shapes | Rectangle / ellipse / line / arrow |
+| Insert image | PNG / JPG, scaled to the page |
+| Whiteout | Drag a box to cover sensitive content |
+| Undo / redo | 80-step snapshots covering both annotations and page operations |
 
-### 内容编辑（真正写回 PDF）
+### Content editing (really written back into the PDF)
 
-- **改字**：用「编辑文字」点一下原文 → 就地修改。原理是采样原文字的**颜色与底色**，
-  先精确遮盖再按原字号重排，中文用系统字体子集嵌入（见 [技术实现](#技术实现)）。
-- **页面管理**：旋转、删除、插入空白页；保存时用 pdf-lib 重建页面顺序与 `/Rotate`。
-- **保存 / 另存为**：只改动被编辑的部分，文档其余结构（书签、元数据、图片流）原样保留。
+- **Edit text**: click the original text with the "Edit text" tool and type. The reader samples the
+  **colour and background** of the original glyphs, covers them precisely, re-typesets at the original
+  size, and embeds a subset of a system font for Chinese (see [How it works](#how-it-works)).
+- **Page management**: rotate, delete, insert blank pages; on save, pdf-lib rebuilds the page order and
+  `/Rotate` entries.
+- **Save / Save as**: only the edited parts change; the rest of the document (bookmarks, metadata, image
+  streams) is preserved as-is.
 
-### OCR 文字识别
+### OCR
 
-- **整页识别** 或 **框选区域识别**
-- **中英双语**：中文模型（6623 字，中英混排）+ 英文模型（95 字符，空格标点更准），
-  默认「自动」——先用中文模型试识别前几行，判断为纯英文时自动切换
-- 识别框叠加显示、按行列出、置信度、复制单行 / 全文
-- **插入为文本框**：把识别结果变成可编辑的 PDF 文本层
-- 完全离线：ONNX 模型 + 本地 CPU 推理，不上传任何图像
+- **Whole page** or **selected region**
+- **Chinese + English**: a Chinese model (6,623 characters, mixed Chinese/English) and an English model
+  (95 characters, better with spaces and punctuation). The default "Auto" mode tries the Chinese model on
+  the first few lines and switches to English when the page is purely English
+- Boxes drawn over the page, line-by-line results, confidence scores, copy one line or everything
+- **Insert as text boxes**: turn recognition results into an editable PDF text layer
+- Fully offline: ONNX models with local CPU inference; no image ever leaves the machine
 
-## 安装
+## Install
 
-### 方式一：安装包（推荐）
+### Option 1: installer (recommended)
 
-到 [Releases](https://github.com/pinzhuo0905-rgb/pdf-reader/releases) 下载 `PDFReader-Setup-x.y.z.exe`，
-双击安装（「仅为我安装」不需要管理员权限）。
+Download `PDFReader-Setup-x.y.z.exe` from [Releases](https://github.com/pinzhuo0905-rgb/pdf-reader/releases)
+and run it ("install for me only" needs no administrator rights).
 
-安装包未做代码签名，首次运行 Windows SmartScreen 可能提示「未知发布者」→ 更多信息 → 仍要运行。
+The installer is not code-signed, so SmartScreen may warn about an unknown publisher the first time:
+*More info → Run anyway*.
 
-安装后 `.pdf` 文件即可在「打开方式」中选择本程序。
+After installing, **PDF Reader** shows up in the "Open with" list for `.pdf` files.
 
-**设为默认 PDF 阅读器**有两种方式：
+**Making it the default PDF reader** — two ways:
 
-1. **静默设置（推荐，全程无弹窗）**——普通权限即可，纯注册表操作：
+1. **Silent setup (recommended, no dialogs)** — no admin rights needed, pure registry work:
 
    ```powershell
    powershell -ExecutionPolicy Bypass -File scripts\set-default-pdf.ps1
    ```
 
-   脚本会把本程序注册为 `.pdf` 的处理程序、写入「打开方式」列表，并清掉系统里那条
-   被哈希保护的 `UserChoice`（原选择会备份到 `%APPDATA%\pdf-reader\assoc-backup.json`，
-   加 `-Restore` 可还原）。
+   The script registers the app as the `.pdf` handler, adds it to the "Open with" list and removes the
+   hash-protected `UserChoice` entry Windows keeps (your previous choice is backed up to
+   `%APPDATA%\pdf-reader\assoc-backup.json`; pass `-Restore` to roll back).
 
-2. 右键任意 PDF → 打开方式 → 选择其他应用 → **PDF Reader**，或菜单 `⋯ → 设为默认 PDF 阅读器`。
+2. Right-click any PDF → Open with → Choose another app → **PDF Reader**, or use the menu
+   `⋯ → Set as default PDF reader`.
 
-### 方式二：从源码运行
+### Option 2: run from source
 
 ```bash
 git clone https://github.com/pinzhuo0905-rgb/pdf-reader.git
 cd pdf-reader
-npm install      # 自动执行 scripts/prepare-vendor.mjs
-npm start        # 开发模式
-npm run dist     # 打包安装包到 dist/
+npm install      # also runs scripts/prepare-vendor.mjs
+npm start        # development mode
+npm run dist     # build the installer into dist/
 ```
 
-需要 Node.js ≥ 18。首次打包会下载 Electron 与 NSIS 工具链（约 200 MB）。
+Requires Node.js ≥ 18. The first build downloads Electron and the NSIS toolchain (about 200 MB).
 
-## 使用
+## Usage
 
-### 快捷键
+### Keyboard shortcuts
 
-| 快捷键 | 功能 | 快捷键 | 功能 |
+| Shortcut | Action | Shortcut | Action |
 | --- | --- | --- | --- |
-| `Ctrl+O` | 打开文件 | `Ctrl+S` | 保存 |
-| `Ctrl+Shift+S` | 另存为 | `Ctrl+P` | 打印 |
-| `Ctrl+F` | 搜索 | `Ctrl+C` / `Ctrl+A` | 复制 / 全选文本 |
-| `Ctrl+Z` / `Ctrl+Y` | 撤销 / 重做 | `Ctrl+ +` / `Ctrl+-` | 放大 / 缩小 |
-| `Ctrl+0` | 适应页面 | `F11` | 全屏 |
-| `PgUp` / `PgDn` | 上一页 / 下一页 | `Delete` | 删除选中标注 |
-| `H` | 高亮 | `D` | 绘制 |
-| `E` | 橡皮擦 | `T` | 文本框 |
-| `R` | 旋转页面 | `V` | 选择工具 |
-| `Ctrl+T` | 新建标签页 | `Ctrl+W` | 关闭标签页 |
-| `Ctrl+Tab` | 下一个标签页 | `Ctrl+Shift+Tab` | 上一个标签页 |
-| `Esc` | 退出当前工具 / 关闭面板 | | |
+| `Ctrl+O` | Open file | `Ctrl+S` | Save |
+| `Ctrl+Shift+S` | Save as | `Ctrl+P` | Print |
+| `Ctrl+F` | Search | `Ctrl+C` / `Ctrl+A` | Copy / select all text |
+| `Ctrl+Z` / `Ctrl+Y` | Undo / redo | `Ctrl+ +` / `Ctrl+-` | Zoom in / out |
+| `Ctrl+0` | Fit page | `F11` | Full screen |
+| `PgUp` / `PgDn` | Previous / next page | `Delete` | Delete selected annotation |
+| `H` | Highlight | `D` | Draw |
+| `E` | Eraser | `T` | Text box |
+| `R` | Rotate page | `V` | Select tool |
+| `Ctrl+T` | New tab | `Ctrl+W` | Close tab |
+| `Ctrl+Tab` | Next tab | `Ctrl+Shift+Tab` | Previous tab |
+| `Esc` | Leave the current tool / close a panel | | |
 
-### 多标签页与目录
+### Tabs and contents
 
-| 操作 | 结果 |
+| Action | Result |
 | --- | --- |
-| `+` / `Ctrl+T` | 新开一个空白标签页（空状态页里可直接选文件） |
-| 打开第二个 PDF | 自动新建标签页；**同一文件重复打开会切回已有标签页** |
-| 拖动标签 | 在标签条内左右拖动 → 调整顺序 |
-| 把标签拖到页面区域松手 | 该文档在新窗口打开，原窗口的标签页关闭 |
-| 中键 / `Ctrl+W` / 标签上的 × | 关闭标签页（有未保存修改会先询问） |
-| 标签上右键 | 关闭其他 / 关闭右侧 / 复制路径 / 在文件夹中显示 / 在新窗口打开 |
-| 左上角 `☰` | 展开或收起「目录」侧栏（书签 + 缩略图） |
+| `+` / `Ctrl+T` | New empty tab (pick a file right from the empty state) |
+| Open a second PDF | A new tab is created; **re-opening the same file switches back to its existing tab** |
+| Drag a tab | Move it left/right within the strip to reorder |
+| Drag a tab onto the page area and release | The document opens in a new window and the tab closes |
+| Middle click / `Ctrl+W` / the × on a tab | Close the tab (asks first if there are unsaved changes) |
+| Right-click a tab | Close others / close to the right / copy path / show in folder / open in new window |
+| `☰` in the top-left | Show or hide the contents sidebar (bookmarks + thumbnails) |
 
-每个标签页的页码、缩放、工具、标注、撤销栈、搜索结果、OCR 结果都是**各自独立**的，
-切回来还是原样。详细交互流程与界面元素见 [docs/tabs-and-sidebar.md](docs/tabs-and-sidebar.md)。
+Each tab keeps its own page number, zoom, tool, annotations, undo stack, search results and OCR results,
+so switching back restores everything. See [docs/tabs-and-sidebar.md](docs/tabs-and-sidebar.md) for the
+full interaction flow.
 
-### 改字的两点说明
+### Two notes on editing text
 
-1. 本项目采用**「遮盖 + 重写」**而不是直接改写原文字流。这是轻量级 PDF 编辑器的通用做法：
-   可靠、不破坏原文档，代价是被改的原文字无法再被"还原"。
-2. 扫描件（图片型 PDF）没有文字层，请先用 **OCR → 插入文本框**，或直接用涂改 + 文本框覆盖。
+1. This project uses **"cover and retype"** rather than rewriting the original text stream. That is the
+   usual approach for lightweight PDF editors: reliable and non-destructive to the rest of the document,
+   at the cost of the replaced text no longer being recoverable.
+2. Scanned (image-only) PDFs have no text layer. Use **OCR → Insert as text boxes**, or whiteout plus a
+   text box.
 
-### OCR 用法
+### Using OCR
 
-1. 工具栏点「文字识别」图标（或 `⋯ → 文字识别`）；
-2. 选择「识别当前页」或「框选区域」；
-3. 语言默认「自动」，也可手动指定「中文 + 英文」/「纯英文」；
-4. 识别完成后可复制全文、点行跳转，或「插入文本框」把结果写进 PDF。
+1. Click the text-recognition icon in the toolbar (or `⋯ → Text recognition`);
+2. Choose "Recognize page" or "Select region";
+3. Leave the language on "Auto", or pick "Chinese + English" / "English only";
+4. When it finishes you can copy everything, click a line to jump to it, or "Insert as text box" to write
+   the results into the PDF.
 
-## 技术实现
+## How it works
 
 ```
-┌──────────────────────────── 主进程 (Node) ────────────────────────────┐
-│  窗口/菜单/IPC   app:// 自定义协议   文件读写   打印    OCR 引擎        │
-│                                                    ├ image.js  几何变换  │
-│                                                    ├ det.js    DB 后处理 │
-│                                                    ├ rec.js    CTC 解码  │
-│                                                    └ index.js  管线/语种  │
+┌──────────────────────────── main process (Node) ──────────────────────┐
+│  windows/menus/IPC   app:// protocol   file IO   printing   OCR engine  │
+│                                                    ├ image.js  geometry │
+│                                                    ├ det.js    DB post  │
+│                                                    ├ rec.js    CTC decode│
+│                                                    └ index.js  pipeline  │
 └───────────────────────────────┬───────────────────────────────────────┘
-                                │ contextBridge（受限 API）
+                                │ contextBridge (restricted API)
 ┌───────────────────────────────┴───────────────────────────────────────┐
-│  渲染进程（原生 DOM，零框架、零打包）                                   │
-│  viewer.js 渲染/缩放/文本层/搜索   annotate.js 标注   textedit.js 改字  │
-│  exporter.js pdf-lib 写回          ocr.js 面板        ui.js 工具栏/快捷键│
+│  renderer (plain DOM, no framework, no bundler)                        │
+│  viewer.js render/zoom/text layer/search   annotate.js   textedit.js   │
+│  exporter.js pdf-lib write-back            ocr.js panel  ui.js         │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
-- **渲染**：PDF.js 3.11 逐页懒渲染，`IntersectionObserver` 控制可见页，远离视口的画布自动释放；
-- **文本层**：按 PDF 文本项生成绝对定位的透明 `span`，二次测量做 `scaleX` 对齐原排版，
-  因此拖选、复制、双击选词都是浏览器原生行为；
-- **标注**：屏幕坐标统一归一化到页面（0–1），导出时按 `/Rotate` 做四象限坐标变换，保证旋转页不错位；
-- **改字**：从页面画布采样原文字色与底色 → 白色/底色矩形遮盖 → 按原字号重排 → 中文字体子集嵌入；
-- **OCR**：DB 文本检测（可微二值化）+ CRNN/SVTR + CTC 贪心解码，**全部预处理/后处理/解码都是本仓库自己写的 JS**，
-  只有 `onnxruntime-node` 作为通用张量运行时；详细原理与实测见 [docs/ocr-research.md](docs/ocr-research.md)。
+- **Rendering**: PDF.js 3.11 renders pages lazily; an `IntersectionObserver` drives visible pages and
+  canvases far from the viewport are released.
+- **Text layer**: absolutely positioned transparent `span`s are generated from PDF text items and then
+  re-measured with `scaleX` to match the original layout, so drag-select, copy and double-click-to-select
+  are native browser behaviour.
+- **Annotations**: coordinates are normalised to the page (0–1) and mapped through the `/Rotate`
+  quadrants on export, so rotated pages never drift.
+- **Text editing**: sample the glyph colour and background from the page canvas → cover with a rectangle →
+  re-typeset at the original size → embed a Chinese font subset.
+- **OCR**: DB text detection (differentiable binarisation) + CRNN/SVTR + greedy CTC decoding. **All
+  preprocessing, post-processing and decoding is JavaScript written in this repository**; only
+  `onnxruntime-node` is used as a generic tensor runtime. See
+  [docs/ocr-research.md](docs/ocr-research.md) for the details and measurements.
 
-### 替换应用图标
+### Replacing the application icon
 
-当前图标复刻了 Edge 作为默认 PDF 查看器时使用的图标（见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)）。
-若要换成自己的图标：
+The current icon mimics the one Edge uses when it is the default PDF viewer (see
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)). To use your own:
 
-1. 准备一张 ≥ 256×256 的 PNG，放到 `build/icon.png`；
-2. 把 `package.json` 里 `build.win.icon`、`nsis.installerIcon` 等指向该 PNG（electron-builder 会自动转 ICO）；
-3. 同步替换 `assets/pdf-icon.ico`（文件关联图标）。
+1. Put a PNG of at least 256×256 at `build/icon.png`;
+2. Point `build.win.icon`, `nsis.installerIcon` and friends in `package.json` at that PNG
+   (electron-builder converts it to ICO automatically);
+3. Replace `assets/pdf-icon.ico` (the file-association icon) as well.
 
-想复刻 Edge 图标本身，可运行 `node scripts/extract-edge-icon.mjs`（需 `npm i -D resedit`）。
+To reproduce the Edge icon itself, run `node scripts/extract-edge-icon.mjs` (requires
+`npm i -D resedit`).
 
-## 已知限制
+## Known limitations
 
-- 文字编辑是「遮盖 + 重写」，不改写原文字流；加密 PDF 暂不支持（不会提示输入密码）
-- 交互式表单（AcroForm）暂不支持填写
-- OCR 对极小字号（<10px）的形近字偶有混淆，密集排版的空格可能被合并
-- 拖出标签页时会**重新从磁盘打开**该文件，未保存的标注不会跟着走（有未保存修改时不允许拖出）
-- 关闭窗口前不会记住标签页，下次启动是空白标签页
-- 目前只提供 Windows x64 安装包，Linux / macOS 需自行 `npm run dist`（核心代码跨平台）
-- 打印走的是「页面渲染成图 → 打印」，不是矢量输出；混合页面尺寸的文档会统一按第一页尺寸排版
-- 没有 PDF 注释层，文档内的超链接与表单控件不可交互（表单请用专用工具填写）
-- 保存后的标注是「画在页面内容上」的图形，不是标准 PDF 注释对象，其他阅读器里不能单独选中/删除
+- Text editing is "cover and retype"; the original text stream is untouched. Encrypted PDFs are not
+  supported (there is no password prompt).
+- Interactive forms (AcroForm) cannot be filled in yet.
+- OCR occasionally confuses similar-looking glyphs at very small sizes (<10px), and spaces in dense
+  layouts may be merged.
+- Tearing out a tab **re-opens the file from disk**; unsaved annotations do not come along (tearing out is
+  blocked while there are unsaved changes).
+- Tabs are not remembered when the window closes; the next launch starts with a blank tab.
+- Only a Windows x64 installer is published; Linux / macOS users need to run `npm run dist` themselves
+  (the core code is cross-platform).
+- Printing renders pages to images first rather than emitting vectors; documents with mixed page sizes are
+  laid out using the first page's size.
+- There is no PDF annotation layer, and in-document links and form widgets are not interactive (use a
+  dedicated tool for forms).
+- Saved annotations are graphics drawn onto the page content, not standard PDF annotation objects, so other
+  readers cannot select or delete them individually.
 
-## 路线图
+## Roadmap
 
-- [x] 多标签页 + 目录侧栏（v1.1）
-- [ ] 表单填写与签名
-- [ ] 批注（Comment）导出为标准 PDF 注释对象
-- [ ] 页面拖拽排序 / 提取
-- [ ] 会话恢复（重启后恢复上次的标签页）
-- [ ] macOS / Linux 构建
+- [x] Tabs + contents sidebar (v1.1)
+- [ ] Form filling and signatures
+- [ ] Export comments as standard PDF annotations
+- [ ] Drag to reorder / extract pages
+- [ ] Session restore (reopen last session's tabs)
+- [ ] macOS / Linux builds
 
-## 贡献
+## Contributing
 
-欢迎 Issue 与 PR，请先读 [CONTRIBUTING.md](CONTRIBUTING.md)。特别欢迎：
+Issues and pull requests are welcome — please read [CONTRIBUTING.md](CONTRIBUTING.md) first. Especially
+welcome:
 
-- 新的 OCR 语种模型接入（日 / 韩 / 俄…）
-- 标注类型扩展（波浪线、删除线、便签）
-- 性能优化（大文档、超长文本行）
+- New OCR language models (Japanese / Korean / Russian …)
+- More annotation types (squiggly, strikethrough, sticky notes)
+- Performance work (very large documents, extremely long text lines)
 
-## 许可证
+## License
 
-[MIT](LICENSE)。第三方组件与资源的许可见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+[MIT](LICENSE). Third-party components and assets are listed in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-> 本项目与 Microsoft 无关，未获得其背书；界面是对 Edge PDF 阅读器的**致敬式复刻**。
+> This project is not affiliated with or endorsed by Microsoft; the UI is a **tribute recreation** of the
+> Edge PDF viewer.

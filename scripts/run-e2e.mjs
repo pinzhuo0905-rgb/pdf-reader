@@ -6,8 +6,13 @@
  *       node scripts/run-e2e.mjs test/e2e/ocr.js --shot out.png
  */
 import { spawn } from 'node:child_process';
+import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
+
+// 测试用独立的用户数据目录：不能和用户正在使用的实例抢单实例锁，
+// 也不要污染用户的 settings.json
+const TEST_PROFILE = path.join(os.tmpdir(), 'pdfreader-e2e-profile');
 
 const args = process.argv.slice(2);
 const script = args[0];
@@ -35,7 +40,7 @@ delete env.ELECTRON_NO_ATTACH_CONSOLE;
 delete env.NODE_OPTIONS;
 if (shot) env.PDFREADER_SHOT = path.resolve(shot);
 
-const child = spawn(electron, ['.', 'test/fixtures/sample.pdf'], {
+const child = spawn(electron, ['.', 'test/fixtures/sample.pdf', `--user-data-dir=${TEST_PROFILE}`], {
   stdio: 'inherit',
   env,
   shell: isWin,

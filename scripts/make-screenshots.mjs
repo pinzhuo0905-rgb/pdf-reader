@@ -7,8 +7,12 @@
  * 或直接使用（GitHub 会自适应宽度）。
  */
 import { spawn } from 'node:child_process';
+import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
+
+// 独立的用户数据目录，避免和正在运行的实例抢单实例锁
+const TEST_PROFILE = path.join(os.tmpdir(), 'pdfreader-e2e-profile');
 
 const SHOTS = [
   ['test/e2e/scenes/01-reader.js', 'docs/screenshots/01-reader.png', 6000],
@@ -33,7 +37,7 @@ function runOne(script, out, delay) {
     // 父进程若带 ELECTRON_RUN_AS_NODE，Electron 会退化成纯 Node
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.NODE_OPTIONS;
-    const child = spawn(electron, ['.', 'test/fixtures/sample.pdf'], {
+    const child = spawn(electron, ['.', 'test/fixtures/sample.pdf', `--user-data-dir=${TEST_PROFILE}`], {
       stdio: 'inherit',
       env,
       shell: isWin,

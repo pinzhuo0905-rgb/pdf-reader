@@ -314,6 +314,66 @@
     App.viewer.setZoom(1, 'custom');
     await sleep(300);
 
+    /* ---------------- 5.6) 动画与文案细节 ---------------- */
+    // 缩放时不能闪白：把画布缩到 60x80 采样，统计非白像素，取整段时间的最小值
+    const tiny = document.createElement('canvas');
+    tiny.width = 60;
+    tiny.height = 80;
+    const tctx = tiny.getContext('2d', { willReadFrequently: true });
+    const inkCount = (canvas) => {
+      if (!canvas || !canvas.width) return 0;
+      tctx.clearRect(0, 0, 60, 80);
+      tctx.drawImage(canvas, 0, 0, 60, 80);
+      const d = tctx.getImageData(0, 0, 60, 80).data;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i] < 245 || d[i + 1] < 245 || d[i + 2] < 245) n++;
+      return n;
+    };
+
+    App.viewer.setZoom(1, 'custom');
+    await sleep(600);
+    const inkBefore = inkCount(st().pages[0].canvas);
+    let minInk = Infinity;
+    $('btn-zoom-in').click();
+    for (let i = 0; i < 30; i++) {
+      await sleep(20);
+      minInk = Math.min(minInk, inkCount(st().pages[0].canvas));
+    }
+    assert('zoomNoWhiteFlash', inkBefore > 5 && minInk > 3, { before: inkBefore, min: minInk });
+    await sleep(400);
+
+    // 展开列表：从上往下滑出（menu-in）
+    $('btn-more').click();
+    await sleep(60);
+    const menuEl = document.querySelector('#menuLayer .menu');
+    assert('menuSlideAnim', !!menuEl && getComputedStyle(menuEl).animationName === 'menu-in', menuEl && getComputedStyle(menuEl).animationName);
+    document.getElementById('menuLayer').classList.add('hidden');
+
+    // 侧栏：从左往右滑出（sidebar-in）
+    App.viewer.toggleSidebar(true);
+    await sleep(60);
+    const sb = $('sidebar');
+    assert('sidebarSlideAnim', getComputedStyle(sb).animationName === 'sidebar-in', getComputedStyle(sb).animationName);
+    await sleep(400);
+    App.viewer.toggleSidebar(false);
+    await sleep(200);
+
+    // 双页提示只说「双页视图」
+    App.viewer.setTwoUp(false);
+    await sleep(200);
+    $('btn-viewmode').click();
+    await sleep(150);
+    assert('twoUpToastShort', $('toast').textContent === '双页视图', $('toast').textContent);
+    $('btn-viewmode').click();
+    await sleep(300);
+
+    // 语言菜单不写字体名
+    assert(
+      'langMenuNoFontName',
+      App.i18n.t('menu.langZh') === '中文' && App.i18n.t('menu.langEn') === 'English',
+      [App.i18n.t('menu.langZh'), App.i18n.t('menu.langEn')]
+    );
+
     /* ---------------- 6) 设置菜单里的语言开关 + 持久化 ---------------- */
     $('btn-settings').click();
     await sleep(200);

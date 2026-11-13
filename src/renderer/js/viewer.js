@@ -39,6 +39,12 @@
     el.empty = document.getElementById('empty');
 
     window.addEventListener('resize', onResize);
+    // 侧栏是滑入动画：宽度在动画过程中一直在变，动画结束后再按最终宽度重算一次缩放
+    if (el.sidebar) {
+      el.sidebar.addEventListener('animationend', () => {
+        if (S().pdfDoc) onResize();
+      });
+    }
     startRepairTimer();
   }
 
@@ -623,10 +629,17 @@
       const changed = !prev || Math.abs(prev - z) / z > 0.03;
       p.el.style.width = p.wPt * z + 'px';
       p.el.style.height = p.hPt * z + 'px';
+      // 画布始终铺满页面框：否则页面先变大、画布还没跟上时会露出白边
+      if (p.canvas) {
+        p.canvas.style.width = p.wPt * z + 'px';
+        p.canvas.style.height = p.hPt * z + 'px';
+      }
       if (changed) {
-        // 只有尺寸真的变了才清空重绘；切换标签页时保留已有画布，避免闪白
+        // 只有尺寸真的变了才重排；旧位图先按新尺寸拉伸显示，等新位图画好再替换
         p._layoutZoom = z;
         sizeOverlay(p);
+        // 标注层刚被清空，立刻按新尺寸重画，避免缩放时标注闪一下消失
+        drawOverlay(p);
         p.rendered = false;
         // 文本层坐标是按当前缩放算的，缩放一变必须作废，否则点选会命中错的行
         p.textItems = null;
@@ -715,16 +728,28 @@
       if (S() !== st) return;
       const viewport = page.getViewport({ scale: zoom * dpr, rotation: p.rot });
       const canvas = p.canvas;
-      canvas.width = Math.round(viewport.width);
-      canvas.height = Math.round(viewport.height);
+      const w = Math.max(1, Math.round(viewport.width));
+      const h = Math.max(1, Math.round(viewport.height));
+      // 先画到离屏画布，画完再整体拷到可见画布。
+      // 直接给 canvas.width 赋值会立刻清空画布，异步绘制完成前就是一片白（点 ± 缩放时闪白）
+      const off = document.createElement('canvas');
+      off.width = w;
+      off.height = h;
+      const octx = off.getContext('2d', { alpha: false });
+      octx.fillStyle = '#ffffff';
+      octx.fillRect(0, 0, w, h);
+      await page.render({ canvasContext: octx, viewport }).promise;
+      if (S() !== st) return;
+      // 同一帧内完成「改尺寸 + 拷贝」，中间不会产生白帧
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
       canvas.style.width = p.wPt * zoom + 'px';
       canvas.style.height = p.hPt * zoom + 'px';
       const ctx = canvas.getContext('2d', { alpha: false });
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      const task = page.render({ canvasContext: ctx, viewport });
-      await task.promise;
-      if (S() !== st) return;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(off, 0, 0);
       p.rendered = true;
       p.canvas.style.visibility = '';
       await buildTextLayer(p, page, zoom);
