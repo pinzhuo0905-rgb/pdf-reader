@@ -219,7 +219,7 @@
     const pinchPreviewScale = parseFloat((pagesEl2.style.transform.match(/scale\(([\d.]+)\)/) || [0, 1])[1]);
     await sleep(450);
     const zPinch = st().zoom;
-    assert('pinchInGrows', zPinch > zPinchStart * 1.03 && zPinch < zPinchStart * 1.07, [+zPinchStart.toFixed(3), +zPinch.toFixed(3)]);
+    assert('pinchInGrows', zPinch > zPinchStart * 1.03 && zPinch < zPinchStart * 1.1, [+zPinchStart.toFixed(3), +zPinch.toFixed(3)]);
     assert(
       'pinchPreviewTracksFinger',
       Math.abs(pinchPreviewScale - zPinch / zPinchStart) < 0.02,
@@ -269,6 +269,40 @@
     const pa1 = normAt(pageEl2, pinchAt);
     assert('pinchKeepsAnchorX', Math.abs(pa1.nx - pa0.nx) < 0.02, [+pa0.nx.toFixed(3), +pa1.nx.toFixed(3)]);
     assert('pinchKeepsAnchorY', Math.abs(pa1.ny - pa0.ny) < 0.02, [+pa0.ny.toFixed(3), +pa1.ny.toFixed(3)]);
+
+    // 鼠标 Ctrl+滚轮一格：应该「滑过去」而不是一步跳到位
+    App.viewer.setZoom(1, 'custom');
+    await sleep(450);
+    const zNotchStart = st().zoom;
+    // 平滑期间 state.zoom 不变，只有预览 transform 在动，所以取 transform 的 scale
+    const previewScale = () => {
+      const m = pagesEl2.style.transform.match(/scale\(([\d.]+)\)/);
+      return m ? parseFloat(m[1]) : 1;
+    };
+    fireWheel(0, -120, { deltaMode: 0 });
+    await sleep(45);
+    const scaleMid = previewScale();
+    await sleep(420);
+    const zNotchEnd = st().zoom;
+    assert('wheelNotchMoves', zNotchEnd > zNotchStart * 1.15, [+zNotchStart.toFixed(3), +zNotchEnd.toFixed(3)]);
+    assert(
+      'wheelNotchSmooth',
+      scaleMid > 1.02 && scaleMid < zNotchEnd / zNotchStart - 0.005,
+      { mid45ms: +scaleMid.toFixed(3), end: +(zNotchEnd / zNotchStart).toFixed(3) }
+    );
+
+    // 灵敏度：一格 ≈ 1.30 倍（exp(0.0022*120)）
+    assert('wheelSensitivity', zNotchEnd / zNotchStart > 1.22 && zNotchEnd / zNotchStart < 1.38, +(zNotchEnd / zNotchStart).toFixed(3));
+
+    // 连续三格应累乘
+    App.viewer.setZoom(1, 'custom');
+    await sleep(450);
+    for (let i = 0; i < 3; i++) {
+      fireWheel(0, -120, { deltaMode: 0 });
+      await sleep(40);
+    }
+    await sleep(450);
+    assert('wheelNotchAccumulates', st().zoom > 1.9 && st().zoom < 2.5, +st().zoom.toFixed(3));
 
     // 单次超大 delta（快速捏合）：不应把缩放顶到极限
     App.viewer.setZoom(1, 'custom');

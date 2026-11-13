@@ -1,6 +1,6 @@
 {
   "name": "pdf-reader",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "界面纯净、功能丰富的 PDF 阅读器：复刻 Edge 阅读器观感，内置标注、内容编辑与中英双语离线 OCR",
   "main": "src/main/main.js",
   "author": "PDF Reader contributors",

@@ -446,40 +446,87 @@
   }
 
   /**
-   * 触控板捏合：每个 wheel 事件按比例累乘，直接跟手（不做缓动），
-   * 停止 140ms 后落位一次。缓动会让快速捏合「追不上手指」，最后落位时再跳一下。
+   * 滚轮/捏合缩放。
+   * - 触控板捏合（高频、小 delta）：直接跟手，不做插值，避免「追不上手指」
+   * - 鼠标 Ctrl+滚轮（一格 deltaY=±120）：按帧插值到目标值，
+   *   否则一次就是一整档，看起来「一节一节的」
+   * 两种都靠 170ms 的空闲定时器统一落位。
    */
-  function pinchZoom(factor, anchor) {
+  let wheelZoom = null;
+
+  function wheelZoomBy(factor, anchor, discrete) {
     if (!S().pdfDoc || !el.pages) return;
     if (zoomAnim) finishZoomAnim();
-    if (!pinch) {
+    if (!wheelZoom) {
       const rect = el.pages.getBoundingClientRect();
       const a = anchor || centerAnchor();
-      pinch = { base: S().zoom, target: S().zoom, anchor: a, ox: a.x - rect.left, oy: a.y - rect.top, timer: 0 };
+      wheelZoom = {
+        base: S().zoom,
+        target: S().zoom,
+        cur: S().zoom,
+        anchor: a,
+        ox: a.x - rect.left,
+        oy: a.y - rect.top,
+        step: 0,
+        timer: 0,
+        smooth: false,
+      };
     }
-    pinch.target = clampZoom(pinch.target * factor);
-    applyPreview(pinch.target, pinch.base, pinch);
-    notifyZoomPreview(pinch.target);
-    clearTimeout(pinch.timer);
-    pinch.timer = setTimeout(commitPinch, 140);
+    if (anchor) wheelZoom.anchor = anchor;
+    wheelZoom.target = clampZoom(wheelZoom.target * factor);
+    wheelZoom.smooth = wheelZoom.smooth || !!discrete;
+
+    if (wheelZoom.smooth) {
+      if (!wheelZoom.step) wheelZoom.step = setTimeout(wheelStep, 16);
+    } else {
+      // 跟手：取消可能残留的插值帧，直接把当前值顶到目标
+      if (wheelZoom.step) {
+        clearTimeout(wheelZoom.step);
+        wheelZoom.step = 0;
+      }
+      wheelZoom.cur = wheelZoom.target;
+      applyPreview(wheelZoom.cur, wheelZoom.base, wheelZoom);
+      notifyZoomPreview(wheelZoom.cur);
+    }
+
+    clearTimeout(wheelZoom.timer);
+    wheelZoom.timer = setTimeout(commitWheelZoom, 170);
   }
 
-  function commitPinch() {
-    const p = pinch;
-    pinch = null;
-    if (!p) return;
-    clearTimeout(p.timer);
-    commitZoom(clampZoom(p.target), p.anchor, 'custom');
+  function wheelStep() {
+    const w = wheelZoom;
+    if (!w) return;
+    const diff = w.target - w.cur;
+    // 指数逼近：每步走 32%，剩 0.15% 时收敛。
+    // 用定时器而不是 rAF：窗口不可见时 rAF 会被挂起，缩放会卡住不动
+    if (Math.abs(diff) <= w.target * 0.0015) {
+      w.cur = w.target;
+      w.step = 0;
+    } else {
+      w.cur += diff * 0.32;
+      w.step = setTimeout(wheelStep, 16);
+    }
+    applyPreview(w.cur, w.base, w);
+    notifyZoomPreview(w.cur);
+  }
+
+  function commitWheelZoom() {
+    const w = wheelZoom;
+    wheelZoom = null;
+    if (!w) return;
+    clearTimeout(w.timer);
+    if (w.step) clearTimeout(w.step);
+    commitZoom(clampZoom(w.target), w.anchor, 'custom');
   }
 
   /** 兼容旧接口：按屏幕坐标缩放 */
   function zoomAt(clientX, clientY, factor) {
-    pinchZoom(factor, { x: clientX, y: clientY });
+    wheelZoomBy(factor, { x: clientX, y: clientY }, false);
   }
 
   /** 切换标签页/窗口尺寸变化前，把未落位的缩放先收尾，避免 transform 残留 */
   function flushZoom() {
-    if (pinch) commitPinch();
+    if (wheelZoom) commitWheelZoom();
     if (zoomAnim) finishZoomAnim();
   }
 
@@ -497,8 +544,8 @@
     return { dx, dy };
   }
 
-  /** 缩放灵敏度：约 1.2 倍 / 120px（与 Chrome 的 Ctrl+滚轮一致） */
-  const ZOOM_SENSITIVITY = 0.0015;
+  /** 缩放灵敏度：约 1.30 倍 / 120px（比 Chrome 的 1.2 略快，滚轮一格更明显） */
+  const ZOOM_SENSITIVITY = 0.0022;
 
   /**
    * Ctrl + 滚轮 / 触控板捏合。
@@ -522,8 +569,10 @@
     if (Math.abs(dy) < 0.5) return;
 
     e.preventDefault();
-    const factor = Math.exp(-dy * ZOOM_SENSITIVITY);
-    pinchZoom(Math.max(0.5, Math.min(2, factor)), { x: e.clientX, y: e.clientY });
+    // 鼠标滚轮一格通常是 120px（或行模式 3 行）；触控板捏合每帧只有个位数像素
+    const discrete = e.deltaMode !== 0 || Math.abs(dy) >= 40;
+    const factor = Math.max(0.5, Math.min(2, Math.exp(-dy * ZOOM_SENSITIVITY)));
+    wheelZoomBy(factor, { x: e.clientX, y: e.clientY }, discrete);
   }
 
   /** 滑块直接指定缩放百分比 */
@@ -1373,6 +1422,7 @@
     zoomOut,
     zoomTo,
     zoomAt,
+    wheelZoomBy,
     flushZoom,
     animateZoom,
     setTwoUp,
