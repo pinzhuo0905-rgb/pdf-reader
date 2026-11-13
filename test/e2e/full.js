@@ -273,7 +273,7 @@
     const t1 = App.tabs.active();
     App.tabs.createBlank(true);
     await sleep(500);
-    assert('tabCreated', App.tabs.list.length === 2, App.tabs.list.length);
+    assert('tabCreated', App.tabs.list.length === 2, { n: App.tabs.list.length, names: App.tabs.list.map((x) => x.state.fileName) });
     // 空白标签页：依赖文档的控件（含缩放滑块）应禁用
     assert('blankTabDisablesZoom', $('zoom-range').disabled === true && $('btn-viewmode').disabled === true);
     App.tabs.activate(t1.id);
@@ -288,19 +288,66 @@
 
     /* ==================== 9.5) 图片 / 右键菜单 / 复制 / OCR 面板 ==================== */
     // 图片标注：用一张 1x1 PNG，验证能画、能导出
-    const PNG =
-      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    // 用真实的 PNG（应用图标）而不是 1x1 占位图，贴近用户插入图片的真实路径
+    const PNG = await new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = im.naturalWidth;
+        c.height = im.naturalHeight;
+        c.getContext('2d').drawImage(im, 0, 0);
+        resolve(c.toDataURL('image/png'));
+      };
+      im.onerror = () => reject(new Error('icon load failed'));
+      im.src = 'assets/pdf-icon-256.png';
+    });
+
+    // 采样导出结果里图片区域的平���颜色：有图片时应该和空白时不同
+    const sampleRegion = async (bytes) => {
+      const doc2 = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+      const pg2 = await doc2.getPage(1);
+      const vp2 = pg2.getViewport({ scale: 1 });
+      const cv = document.createElement('canvas');
+      cv.width = Math.ceil(vp2.width);
+      cv.height = Math.ceil(vp2.height);
+      const c2 = cv.getContext('2d');
+      c2.fillStyle = '#fff';
+      c2.fillRect(0, 0, cv.width, cv.height);
+      await pg2.render({ canvasContext: c2, viewport: vp2 }).promise;
+      const cx = Math.round((0.1 + 0.06) * cv.width);
+      const cy = Math.round((0.1 + 0.06) * cv.height);
+      const d = c2.getImageData(Math.max(0, cx - 4), Math.max(0, cy - 4), 8, 8).data;
+      let r = 0,
+        g = 0,
+        b = 0,
+        n = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        r += d[i];
+        g += d[i + 1];
+        b += d[i + 2];
+        n++;
+      }
+      return [r / n, g / n, b / n];
+    };
+
+    const bytesPlain = await App.exporter.build();
+    const pxPlain = await sampleRegion(bytesPlain);
+
     const imgAnnot = App.annots.add(page.id, { type: 'image', x: 0.1, y: 0.1, w: 0.12, h: 0.12, data: PNG });
     await sleep(250);
     let imgExportOk = true;
+    let pxWith = pxPlain;
     try {
       const b2 = await App.exporter.build();
       const d2 = await PDFLib.PDFDocument.load(b2);
       imgExportOk = d2.getPageCount() === S().pages.length;
+      pxWith = await sampleRegion(b2);
     } catch (e) {
       imgExportOk = false;
     }
+    const diff = Math.abs(pxWith[0] - pxPlain[0]) + Math.abs(pxWith[1] - pxPlain[1]) + Math.abs(pxWith[2] - pxPlain[2]);
     assert('imageAnnotExport', !!imgAnnot && imgExportOk);
+    assert('imageAnnotDrawn', diff > 12, { plain: pxPlain.map(Math.round), withImg: pxWith.map(Math.round), diff: Math.round(diff) });
     App.annots.remove(page.id, imgAnnot.id);
     await sleep(150);
 

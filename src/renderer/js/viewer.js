@@ -105,6 +105,7 @@
   /** 把 viewer 的 el 指向某个标签页（切换标签页时调用） */
   function bindTab(tab) {
     if (!tab || !tab.dom) return;
+    flushZoom();
     el.view = tab.dom.view;
     el.scroll = tab.dom.scroll;
     el.pages = tab.dom.pages;
@@ -327,10 +328,49 @@
   }
 
   /**
-   * 平滑缩放：先在 .pages 上做 CSS transform 预览（逐帧插值，不触发重绘），
-   * 动画结束后再真正改布局。anchor 为屏幕坐标，缩放时该点下的内容保持不动。
+   * 缩放预览：在 .pages 上做 CSS transform（不触发重绘）。
+   * origin 用「未缩放时的页面容器坐标」固定住，锚点下的内容才不会随缩放游走。
    */
-  let zoomAnim = null;
+  let zoomAnim = null; // 按钮/滑块/快捷键：带缓动
+  let pinch = null; // 触控板捏合：1:1 跟手，停止后一次性落位
+
+  function applyPreview(target, base, origin) {
+    if (!el.pages || !base) return;
+    const ratio = target / base;
+    el.pages.style.transformOrigin = origin.ox + 'px ' + origin.oy + 'px';
+    el.pages.style.transform = 'scale(' + ratio.toFixed(4) + ')';
+  }
+
+  function clearPreview() {
+    if (!el.pages) return;
+    el.pages.style.transform = '';
+    el.pages.style.transformOrigin = '';
+  }
+
+  /** 当前锚点在页面里的归一化位置（缩放前后不变，用于落位后还原视点） */
+  function anchorNorm(anchor) {
+    const st = S();
+    const page = st.pages[st.currentPage] || st.pages[0];
+    if (!page || !page.el) return null;
+    const r = page.el.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    return { page, nx: (anchor.x - r.left) / r.width, ny: (anchor.y - r.top) / r.height };
+  }
+
+  /**
+   * 落位：清掉 transform → 真正改布局 → 用归一化锚点把视点挪回去。
+   * 之前用 offsetLeft/offsetTop 换算，页面居中时（.pages margin:auto）横向会算错，
+   * 表现为捏合缩放时内容左右漂移。
+   */
+  function commitZoom(target, anchor, mode) {
+    const norm = anchor ? anchorNorm(anchor) : null;
+    clearPreview();
+    setZoom(target, mode);
+    if (!norm || !el.scroll) return;
+    const r = norm.page.el.getBoundingClientRect();
+    el.scroll.scrollLeft += r.left + norm.nx * r.width - anchor.x;
+    el.scroll.scrollTop += r.top + norm.ny * r.height - anchor.y;
+  }
 
   function animateZoom(target, anchor, mode, duration) {
     const st = S();
@@ -340,9 +380,23 @@
       return;
     }
     if (!zoomAnim) {
-      zoomAnim = { cur: st.zoom, target: st.zoom, raf: 0, anchor: null, mode: null, from: st.zoom, t0: 0 };
+      const a = anchor || centerAnchor();
+      const rect = el.pages.getBoundingClientRect();
+      zoomAnim = {
+        cur: st.zoom,
+        target: st.zoom,
+        from: st.zoom,
+        t0: 0,
+        raf: 0,
+        timer: 0,
+        anchor: a,
+        // 固定 origin：每帧重算会因为 rect 已被 transform 放大而漂移
+        ox: a.x - rect.left,
+        oy: a.y - rect.top,
+        mode: null,
+      };
     }
-    zoomAnim.anchor = anchor || zoomAnim.anchor || centerAnchor();
+    zoomAnim.anchor = anchor || zoomAnim.anchor;
     zoomAnim.mode = mode || zoomAnim.mode;
     zoomAnim.target = to;
     if (duration === 0) {
@@ -350,10 +404,7 @@
       finishZoomAnim();
       return;
     }
-    if (!zoomAnim.raf) {
-      zoomAnim.cur = zoomAnim.cur || st.zoom;
-      zoomAnim.raf = requestAnimationFrame(zoomStep);
-    }
+    if (!zoomAnim.raf) zoomAnim.raf = requestAnimationFrame(zoomStep);
     // 中途改目标：从当前值重新起算，避免曲线跳变
     zoomAnim.from = zoomAnim.cur;
     zoomAnim.t0 = performance.now();
@@ -370,15 +421,9 @@
     if (!a) return;
     const dur = 150;
     const k = Math.min(1, (now - a.t0) / dur);
-    // easeOutCubic
-    const e = 1 - Math.pow(1 - k, 3);
+    const e = 1 - Math.pow(1 - k, 3); // easeOutCubic
     a.cur = a.from + (a.target - a.from) * e;
-    const ratio = a.cur / S().zoom;
-    const rect = el.pages.getBoundingClientRect();
-    const ox = Math.max(0, Math.min(rect.width, a.anchor.x - rect.left));
-    const oy = Math.max(0, Math.min(rect.height, a.anchor.y - rect.top));
-    el.pages.style.transformOrigin = ox + 'px ' + oy + 'px';
-    el.pages.style.transform = 'scale(' + ratio.toFixed(4) + ')';
+    applyPreview(a.cur, S().zoom, a);
     notifyZoomPreview(a.cur);
     if (k >= 1) {
       a.raf = 0;
@@ -397,45 +442,88 @@
     zoomAnim = null;
     if (!a) return;
     clearTimeout(a.timer);
-    if (el.pages) {
-      el.pages.style.transform = '';
-      el.pages.style.transformOrigin = '';
-    }
-    // 让锚点下的内容保持不动：换算成滚动位置
-    const anchor = a.anchor;
-    const oldZoom = S().zoom;
-    const nextZoom = clampZoom(a.target);
-    const ratio = nextZoom / (oldZoom || 1);
-    const pageTop = el.pages.offsetTop;
-    const pageLeft = el.pages.offsetLeft;
-    const rect = el.pages.getBoundingClientRect();
-    const ox = Math.max(0, Math.min(rect.width, (anchor ? anchor.x : rect.left + rect.width / 2) - rect.left));
-    const oy = Math.max(0, Math.min(rect.height, (anchor ? anchor.y : rect.top + rect.height / 2) - rect.top));
-    setZoom(nextZoom, a.mode);
-    if (anchor && el.scroll) {
-      const area = el.scroll.getBoundingClientRect();
-      el.scroll.scrollLeft = pageLeft + ox * ratio - (anchor.x - area.left);
-      el.scroll.scrollTop = pageTop + oy * ratio - (anchor.y - area.top);
-    }
+    commitZoom(clampZoom(a.target), a.anchor, a.mode);
   }
 
-  /** 滚轮缩放：以鼠标位置为锚点 */
+  /**
+   * 触控板捏合：每个 wheel 事件按比例累乘，直接跟手（不做缓动），
+   * 停止 140ms 后落位一次。缓动会让快速捏合「追不上手指」，最后落位时再跳一下。
+   */
+  function pinchZoom(factor, anchor) {
+    if (!S().pdfDoc || !el.pages) return;
+    if (zoomAnim) finishZoomAnim();
+    if (!pinch) {
+      const rect = el.pages.getBoundingClientRect();
+      const a = anchor || centerAnchor();
+      pinch = { base: S().zoom, target: S().zoom, anchor: a, ox: a.x - rect.left, oy: a.y - rect.top, timer: 0 };
+    }
+    pinch.target = clampZoom(pinch.target * factor);
+    applyPreview(pinch.target, pinch.base, pinch);
+    notifyZoomPreview(pinch.target);
+    clearTimeout(pinch.timer);
+    pinch.timer = setTimeout(commitPinch, 140);
+  }
+
+  function commitPinch() {
+    const p = pinch;
+    pinch = null;
+    if (!p) return;
+    clearTimeout(p.timer);
+    commitZoom(clampZoom(p.target), p.anchor, 'custom');
+  }
+
+  /** 兼容旧接口：按屏幕坐标缩放 */
   function zoomAt(clientX, clientY, factor) {
-    const st = S();
-    const base = zoomAnim ? zoomAnim.target : st.zoom;
-    animateZoom(base * factor, { x: clientX, y: clientY }, 'custom');
+    pinchZoom(factor, { x: clientX, y: clientY });
   }
 
-  /** Ctrl + 滚轮：平滑缩放，鼠标下的内容保持不动 */
+  /** 切换标签页/窗口尺寸变化前，把未落位的缩放先收尾，避免 transform 残留 */
+  function flushZoom() {
+    if (pinch) commitPinch();
+    if (zoomAnim) finishZoomAnim();
+  }
+
+  /** 滚轮 delta 归一化成像素（触控板/鼠标/行模式三种单位） */
+  function wheelDelta(e) {
+    let dx = e.deltaX || 0;
+    let dy = e.deltaY || 0;
+    if (e.deltaMode === 1) {
+      dx *= 16; // DOM_DELTA_LINE
+      dy *= 16;
+    } else if (e.deltaMode === 2) {
+      dx *= 100; // DOM_DELTA_PAGE
+      dy *= 100;
+    }
+    return { dx, dy };
+  }
+
+  /** 缩放灵敏度：约 1.2 倍 / 120px（与 Chrome 的 Ctrl+滚轮一致） */
+  const ZOOM_SENSITIVITY = 0.0015;
+
+  /**
+   * Ctrl + 滚轮 / 触控板捏合。
+   * 触控板捏合在 Chromium 里就是带 ctrlKey 的 wheel，deltaY 很小且频率很高；
+   * 双指斜向滑动会同时给 deltaX，横向占主导时按横向滚动处理，避免误缩放。
+   */
   function onWheel(e) {
     if (!e.ctrlKey && !e.metaKey) return;
     if (!S().pdfDoc || !el.scroll) return;
-    // 只处理当前激活标签页的滚动区
     if (el.scroll !== e.currentTarget) return;
+
+    const { dx, dy } = wheelDelta(e);
+    if (!dx && !dy) return;
+
+    if (Math.abs(dx) > Math.abs(dy) * 2 && Math.abs(dy) < 6) {
+      e.preventDefault();
+      el.scroll.scrollLeft += dx;
+      return;
+    }
+    // 触控板抖动的极小值直接丢弃，避免缩放值来回跳
+    if (Math.abs(dy) < 0.5) return;
+
     e.preventDefault();
-    const raw = Math.pow(1.0018, -e.deltaY);
-    const factor = Math.max(0.75, Math.min(1.34, raw));
-    zoomAt(e.clientX, e.clientY, factor);
+    const factor = Math.exp(-dy * ZOOM_SENSITIVITY);
+    pinchZoom(Math.max(0.5, Math.min(2, factor)), { x: e.clientX, y: e.clientY });
   }
 
   /** 滑块直接指定缩放百分比 */
@@ -518,7 +606,9 @@
       el.pages.style.width = '';
       return;
     }
-    el.pages.style.width = Math.round(maxW * 2 + TWO_UP_GAP + PAD_X * 2) + 'px';
+    // 多给 2px：页面宽度常是小数（如 595*0.7=416.5），四舍五入后两页正好等于容器内宽，
+    // 亚像素误差会让第二页被挤到下一行，表现为「双页只显示一页」
+    el.pages.style.width = Math.ceil(maxW * 2 + TWO_UP_GAP + PAD_X * 2) + 2 + 'px';
   }
 
   function sizeOverlay(p) {
@@ -849,6 +939,7 @@
   }
 
   function onResize() {
+    flushZoom();
     S()._viewWidth = el && el.scroll ? el.scroll.clientWidth : 0;
     if (!el.scroll || !S().pdfDoc) return;
     if (S().zoomMode === 'fitWidth' || S().zoomMode === 'fitPage' || S().zoomMode === 'auto') {
@@ -1282,6 +1373,7 @@
     zoomOut,
     zoomTo,
     zoomAt,
+    flushZoom,
     animateZoom,
     setTwoUp,
     notifyZoom,

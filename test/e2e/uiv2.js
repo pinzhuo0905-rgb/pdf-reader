@@ -182,6 +182,104 @@
     await sleep(200);
     assert('inlineEscCancels', !$('textEditor') && App.annots.get(page.id).length === n0, [n0, App.annots.get(page.id).length]);
 
+    /* ---------------- 5.5) 触控板捏合 / 斜向手势 ---------------- */
+    const area2 = $('views').querySelector('.view.active .scroll-area');
+    const ar2 = area2.getBoundingClientRect();
+    const pinchAt = { x: ar2.left + ar2.width * 0.62, y: ar2.top + ar2.height * 0.42 };
+    const fireWheel = (dx, dy, extra = {}) =>
+      area2.dispatchEvent(
+        new WheelEvent('wheel', {
+          deltaX: dx,
+          deltaY: dy,
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+          clientX: pinchAt.x,
+          clientY: pinchAt.y,
+          ...extra,
+        })
+      );
+    const normAt = (pageEl, pt) => {
+      const r = pageEl.getBoundingClientRect();
+      return { nx: (pt.x - r.left) / r.width, ny: (pt.y - r.top) / r.height };
+    };
+    const pagesEl2 = $('views').querySelector('.view.active .pages');
+    const pageEl2 = st().pages[0].el;
+
+    // 30 次 deltaY=-1 的慢速捏合：应放大约 4.6%，且中途不跳变
+    App.viewer.setZoom(1, 'custom');
+    await sleep(400);
+    const zPinchStart = st().zoom;
+    const samples = [];
+    for (let i = 0; i < 30; i++) {
+      fireWheel(0, -1);
+      await sleep(16);
+      samples.push(st().zoom);
+    }
+    const pinchPreviewScale = parseFloat((pagesEl2.style.transform.match(/scale\(([\d.]+)\)/) || [0, 1])[1]);
+    await sleep(450);
+    const zPinch = st().zoom;
+    assert('pinchInGrows', zPinch > zPinchStart * 1.03 && zPinch < zPinchStart * 1.07, [+zPinchStart.toFixed(3), +zPinch.toFixed(3)]);
+    assert(
+      'pinchPreviewTracksFinger',
+      Math.abs(pinchPreviewScale - zPinch / zPinchStart) < 0.02,
+      [pinchPreviewScale, +(zPinch / zPinchStart).toFixed(4)]
+    );
+    assert('pinchNoTransformLeft', !pagesEl2.style.transform, pagesEl2.style.transform);
+    const pinchPageW = pageEl2.getBoundingClientRect().width;
+    assert('pinchSizeMatchesZoom', Math.abs(pinchPageW - st().pages[0].wPt * st().zoom) < 2, [Math.round(pinchPageW), Math.round(st().pages[0].wPt * st().zoom)]);
+
+    // 反向捏合：应缩小，且不越过上下限
+    for (let i = 0; i < 30; i++) {
+      fireWheel(0, 1);
+      await sleep(16);
+    }
+    await sleep(450);
+    assert('pinchOutShrinks', st().zoom < zPinch * 0.97, [+zPinch.toFixed(3), +st().zoom.toFixed(3)]);
+
+    // deltaMode=1（行模式）应被归一化：一行 ≈ 16px，缩放幅度不能趋近于 0
+    App.viewer.setZoom(1, 'custom');
+    await sleep(400);
+    fireWheel(0, -1, { deltaMode: 1 });
+    await sleep(450);
+    assert('pinchLineModeNormalized', st().zoom > 1.01, +st().zoom.toFixed(4));
+
+    // 斜向双指滑动（横向占主导）：不应触发缩放
+    App.viewer.setZoom(1, 'custom');
+    await sleep(400);
+    const zBeforeDiag = st().zoom;
+    for (let i = 0; i < 20; i++) {
+      fireWheel(-40, -2);
+      await sleep(16);
+    }
+    await sleep(450);
+    assert('diagonalNoAccidentalZoom', Math.abs(st().zoom - zBeforeDiag) < 0.001, [+zBeforeDiag.toFixed(3), +st().zoom.toFixed(3)]);
+
+    // 高倍率下捏合：锚点（鼠标下的内容）应保持不动
+    App.viewer.setZoom(2.5, 'custom');
+    await sleep(500);
+    area2.scrollLeft = 40;
+    await sleep(80);
+    const pa0 = normAt(pageEl2, pinchAt);
+    for (let i = 0; i < 12; i++) {
+      fireWheel(0, -4);
+      await sleep(16);
+    }
+    await sleep(450);
+    const pa1 = normAt(pageEl2, pinchAt);
+    assert('pinchKeepsAnchorX', Math.abs(pa1.nx - pa0.nx) < 0.02, [+pa0.nx.toFixed(3), +pa1.nx.toFixed(3)]);
+    assert('pinchKeepsAnchorY', Math.abs(pa1.ny - pa0.ny) < 0.02, [+pa0.ny.toFixed(3), +pa1.ny.toFixed(3)]);
+
+    // 单次超大 delta（快速捏合）：不应把缩放顶到极限
+    App.viewer.setZoom(1, 'custom');
+    await sleep(400);
+    fireWheel(0, -400);
+    await sleep(450);
+    assert('pinchHugeDeltaClamped', st().zoom > 1 && st().zoom < 2.2, +st().zoom.toFixed(3));
+
+    App.viewer.setZoom(1, 'custom');
+    await sleep(300);
+
     /* ---------------- 6) 设置菜单里的语言开关 + 持久化 ---------------- */
     $('btn-settings').click();
     await sleep(200);

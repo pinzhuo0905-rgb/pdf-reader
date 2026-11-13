@@ -121,7 +121,7 @@
       const list = App.annots.get(model.id);
       for (const a of list) {
         try {
-          drawAnnot(doc, page, a, W, H, R, font, { degrees, LineCapStyle, BlendMode });
+          await drawAnnot(doc, page, a, W, H, R, font, { degrees, LineCapStyle, BlendMode });
         } catch (e) {
           console.warn('draw annot failed', a.type, e);
         }
@@ -134,7 +134,7 @@
     return bytes;
   }
 
-  function drawAnnot(doc, page, a, W, H, R, font, lib) {
+  async function drawAnnot(doc, page, a, W, H, R, font, lib) {
     const { degrees, LineCapStyle, BlendMode } = lib;
     const rgb = hexToRgb;
     // 标注坐标是「显示坐标系」的归一化值：宽高必须用旋转后的显示尺寸，
@@ -230,7 +230,9 @@
       case 'image': {
         const bytes = dataUrlToBytes(a.data);
         const isPng = a.data.startsWith('data:image/png');
-        const img = isPng ? doc.embedPng(bytes) : doc.embedJpg(bytes);
+        // embedPng / embedJpg 返回的是 Promise，必须 await，
+        // 否则拿到的是 Promise，drawImage 会抛错，图片只被嵌入却不会被画到页面上
+        const img = await (isPng ? doc.embedPng(bytes) : doc.embedJpg(bytes));
         const anchor = mapPoint(W, H, R, a.x * DW, (a.y + a.h) * DH);
         page.drawImage(img, {
           x: anchor.x,
