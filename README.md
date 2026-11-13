@@ -8,8 +8,8 @@
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-A lightweight PDF reader that looks and feels like Microsoft Edge's built-in viewer, but ships with
-**tabs**, annotation, in-place text editing, page management and fully offline OCR.
+A lightweight, fast PDF reader with **tabs**, annotation, in-place text editing, page management and
+fully offline OCR — all inside a single, uncluttered window.
 
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078D4?style=flat-square)](#install)
 [![License](https://img.shields.io/badge/license-MIT-2ea44f?style=flat-square)](LICENSE)
@@ -25,7 +25,7 @@ A lightweight PDF reader that looks and feels like Microsoft Edge's built-in vie
 
 The options out there fall into two camps:
 
-- **Browser built-ins** (Edge / Chrome): clean, instant, but you cannot do anything beyond scribbling;
+- **Browser built-ins**: clean and instant, but you cannot do anything beyond scribbling;
 - **"All-in-one" PDF suites**: everything included — plus a start screen, membership pop-ups, sidebar
   recommendations, a cloud account, and a 500 MB download.
 
@@ -36,7 +36,7 @@ features missing. No ads, no account, no network — it works offline, and even 
 
 | 🫧 Clean UI | 🧰 Serious features |
 | --- | --- |
-| Toolbar laid out like Edge's PDF viewer: one row, 48px, no nested menu maze | Highlight / pen / eraser / text box / shapes / images / whiteout — all written back into the PDF |
+| One 48px toolbar row, no nested menu maze | Highlight / pen / eraser / text box / shapes / images / whiteout — all written back into the PDF |
 | No start screen, no ads, no recommendations, no "upgrade to Pro" | Click the original text to **edit it in place** (no dialog), with automatic font subsetting |
 | No account, no cloud sync, no network requests at all | Rotate / delete / insert pages, with the PDF genuinely rebuilt on save |
 | Dark and light themes stay restrained and never fight the content | Home-grown **offline OCR**, automatic Chinese/English switching, scanned pages become selectable text |
@@ -254,16 +254,13 @@ full interaction flow.
 
 ### Replacing the application icon
 
-The current icon mimics the one Edge uses when it is the default PDF viewer (see
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)). To use your own:
+The default icon shipped with the project is described in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+To use your own:
 
 1. Put a PNG of at least 256×256 at `build/icon.png`;
 2. Point `build.win.icon`, `nsis.installerIcon` and friends in `package.json` at that PNG
    (electron-builder converts it to ICO automatically);
 3. Replace `assets/pdf-icon.ico` (the file-association icon) as well.
-
-To reproduce the Edge icon itself, run `node scripts/extract-edge-icon.mjs` (requires
-`npm i -D resedit`).
 
 ## Known limitations
 
@@ -306,6 +303,3 @@ welcome:
 
 [MIT](LICENSE). Third-party components and assets are listed in
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
-
-> This project is not affiliated with or endorsed by Microsoft; the UI is a **tribute recreation** of the
-> Edge PDF viewer.

@@ -32,13 +32,13 @@ pdf-reader
 **Description（About 那一行，建议 ≤ 120 字符）**
 
 ```
-界面纯净、功能丰富的 PDF 阅读器：复刻 Edge 阅读器观感，内置标注、改字、页面编辑与中英双语离线 OCR
+界面纯净、功能丰富的 PDF 阅读器：多标签页、标注、原地改字、页面管理，内置中英双语离线 OCR
 ```
 
 英文版（想让国际用户也能搜到就把英文放前面）：
 
 ```
-A clean-UI, feature-rich PDF reader — Edge-like toolbar with annotations, text editing and offline CN/EN OCR.
+A lightweight, feature-rich PDF reader: tabs, annotation, in-place text editing, page management and fully offline Chinese/English OCR.
 ```
 
 **Topics（20 个以内，逗号分隔）**
@@ -95,7 +95,7 @@ git status --short | head -30
 git add .
 git commit -m "feat: 首个公开版本 —— 界面纯净、功能丰富的 PDF 阅读器
 
-- 复刻 Edge PDF 阅读器工具栏（一层、48px、无二级菜单）
+- 单层 48px 工具栏，无二级菜单
 - 文本选择/复制、全文搜索、缩略图、深色主题
 - 标注：高亮（按行吸附）/画笔/橡皮/文本框/形状/图片/涂改 + 80 步撤销
 - 内容编辑：点击原文改字、页面旋转/删除/插入，保存时写回 PDF
@@ -113,7 +113,7 @@ git commit -m "feat: 首个公开版本 —— 界面纯净、功能丰富的 PD
 ```bash
 gh auth login                      # 首次使用需要登录
 gh repo create pdf-reader --public --source=. --remote=origin --push \
-  --description "界面纯净、功能丰富的 PDF 阅读器：复刻 Edge 阅读器观感，内置标注、改字、页面编辑与中英双语离线 OCR"
+  --description "界面纯净、功能丰富的 PDF 阅读器：多标签页、标注、原地改字、页面管理，内置中英双语离线 OCR"
 ```
 
 **方式 B：网页 + 手动**
@@ -172,5 +172,5 @@ gh release create v1.0.0 \
 | 安装包进了仓库 | `dist/` 已在 `.gitignore`，别用 `git add -f` 强行加；走 Release 附件 |
 | 模型权重过大 | `assets/models/*.onnx` 共 23 MB，单文件最大 10.8 MB，可正常入库；后续换更大模型请用 LFS |
 | 换行符 | Windows 上提交可能出现 CRLF 噪声，建议 `git config core.autocrlf input` |
-| 图标版权 | `build/icon.ico` 复刻自 Edge，见 `THIRD-PARTY-NOTICES.md`；公开分发前请自行确认或替换 |
+| 图标版权 | `build/icon.ico` 的来源与许可见 `THIRD-PARTY-NOTICES.md`；公开分发前请自行确认或替换 |
 | 未签名安装包 | SmartScreen 会提示「未知发布者」，在 Release 说明里写清楚，避免用户以为有毒 |

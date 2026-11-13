@@ -8,7 +8,7 @@
 
 **界面纯净 · 功能丰富**
 
-复刻 Microsoft Edge 内置 PDF 阅读器的观感，却把**多标签页**、标注、改字、页面管理、离线 OCR 全部装了进去。
+一个轻快的 PDF 阅读器：界面只留一层工具栏，却把**多标签页**、标注、改字、页面管理、离线 OCR 全都装了进去。
 
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078D4?style=flat-square)](#安装)
 [![License](https://img.shields.io/badge/license-MIT-2ea44f?style=flat-square)](LICENSE)
@@ -24,7 +24,7 @@
 
 市面上的选择基本分两类：
 
-- **浏览器内置阅读器**（Edge / Chrome）：界面干净、打开即读，但除了画两笔什么都做不了；
+- **浏览器内置阅读器**：界面干净、打开即读，但除了画两笔什么都做不了；
 - **「全能」PDF 工具**：功能一堆，代价是启动页、会员弹窗、右侧推荐、云同步账号，以及动辄 500 MB 的体积。
 
 **这个项目想证明两件事可以同时成立**：界面只保留你真正需要的那一层工具栏，而功能一个都不少。
@@ -34,7 +34,7 @@
 
 | 🫧 界面纯净 | 🧰 功能丰富 |
 | --- | --- |
-| 工具栏与 Edge PDF 阅读器同款布局：一层、48px、无二级菜单迷宫 | 高亮 / 画笔 / 橡皮 / 文本框 / 形状 / 图片 / 涂改，全部能写回 PDF |
+| 一层 48px 工具栏，没有二级菜单迷宫 | 高亮 / 画笔 / 橡皮 / 文本框 / 形状 / 图片 / 涂改，全部能写回 PDF |
 | 无启动页、无广告、无推荐、无「升级 Pro」 | 点击原文即可**原地改字**（不弹框，直接写在页面上），中文字体子集自动嵌入 |
 | 无账号、无云同步、无任何网络请求 | 页面旋转 / 删除 / 插入，保存时真正重排 PDF |
 | 深色 / 浅色主题都保持克制，不抢内容 | 自研 **离线 OCR**，中英双语自动切换，扫描页变可复制文本 |
@@ -233,14 +233,12 @@ npm run dist     # 打包安装包到 dist/
 
 ### 替换应用图标
 
-当前图标复刻了 Edge 作为默认 PDF 查看器时使用的图标（见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)）。
+项目自带默认图标的来源见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
 若要换成自己的图标：
 
 1. 准备一张 ≥ 256×256 的 PNG，放到 `build/icon.png`；
 2. 把 `package.json` 里 `build.win.icon`、`nsis.installerIcon` 等指向该 PNG（electron-builder 会自动转 ICO）；
 3. 同步替换 `assets/pdf-icon.ico`（文件关联图标）。
-
-想复刻 Edge 图标本身，可运行 `node scripts/extract-edge-icon.mjs`（需 `npm i -D resedit`）。
 
 ## 已知限制
 
@@ -274,5 +272,3 @@ npm run dist     # 打包安装包到 dist/
 ## 许可证
 
 [MIT](LICENSE)。第三方组件与资源的许可见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
-
-> 本项目与 Microsoft 无关，未获得其背书；界面是对 Edge PDF 阅读器的**致敬式复刻**。
