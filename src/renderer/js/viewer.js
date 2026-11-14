@@ -39,12 +39,7 @@
     el.empty = document.getElementById('empty');
 
     window.addEventListener('resize', onResize);
-    // 侧栏是滑入动画：宽度在动画过程中一直在变，动画结束后再按最终宽度重算一次缩放
-    if (el.sidebar) {
-      el.sidebar.addEventListener('animationend', () => {
-        if (S().pdfDoc) onResize();
-      });
-    }
+    // 侧栏现在是浮层，不占布局宽度：开关它不影响缩放，也就不需要重算
     startRepairTimer();
   }
 
@@ -1290,14 +1285,12 @@
 
   function toggleSidebar(show) {
     const visible = show === undefined ? el.sidebar.classList.contains('hidden') : show;
+    // 浮层不改变文档区域宽度：只切换显示，不动缩放，PDF 不会被推挤或重新排版
     el.sidebar.classList.toggle('hidden', !visible);
     if (visible) {
       buildThumbs();
       buildOutline();
     }
-    requestAnimationFrame(() => {
-      if (S().pdfDoc) onResize();
-    });
     return visible;
   }
 

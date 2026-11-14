@@ -349,14 +349,56 @@
     assert('menuSlideAnim', !!menuEl && getComputedStyle(menuEl).animationName === 'menu-in', menuEl && getComputedStyle(menuEl).animationName);
     document.getElementById('menuLayer').classList.add('hidden');
 
-    // 侧栏：从左往右滑出（sidebar-in）
+    // 侧栏：浮层 + 从左滑出（slide-in-left），且不推挤文档
+    const pageEl = st().pages[0].el;
+    const rectBefore = pageEl.getBoundingClientRect();
+    const areaBefore = $('views').querySelector('.view.active .scroll-area').clientWidth;
     App.viewer.toggleSidebar(true);
     await sleep(60);
     const sb = $('sidebar');
-    assert('sidebarSlideAnim', getComputedStyle(sb).animationName === 'sidebar-in', getComputedStyle(sb).animationName);
-    await sleep(400);
+    assert('sidebarSlideAnim', getComputedStyle(sb).animationName === 'slide-in-left', getComputedStyle(sb).animationName);
+    assert('sidebarFloats', getComputedStyle(sb).position === 'absolute', getComputedStyle(sb).position);
+    assert('sidebarHasShadow', getComputedStyle(sb).boxShadow !== 'none', getComputedStyle(sb).boxShadow.slice(0, 30));
+    // 隐藏窗口里 CSS 动画不推进，测几何前先快进到终态
+    sb.getAnimations().forEach((a) => {
+      try {
+        a.finish();
+      } catch (e) {}
+    });
+    await sleep(300);
+    const rectAfter = pageEl.getBoundingClientRect();
+    const areaAfter = $('views').querySelector('.view.active .scroll-area').clientWidth;
+    assert('sidebarNoPush', Math.abs(rectAfter.left - rectBefore.left) < 1 && Math.abs(rectAfter.width - rectBefore.width) < 1, {
+      before: [Math.round(rectBefore.left), Math.round(rectBefore.width)],
+      after: [Math.round(rectAfter.left), Math.round(rectAfter.width)],
+    });
+    assert('sidebarNoReflow', Math.abs(areaAfter - areaBefore) < 1, [areaBefore, areaAfter]);
+    // 浮层应该真的盖在页面上（命中测试落在侧栏内部）
+    const hit = document.elementFromPoint(60, 200);
+    assert('sidebarOnTop', !!hit && sb.contains(hit), hit && (hit.id || hit.className));
     App.viewer.toggleSidebar(false);
     await sleep(200);
+
+    // 悬停：图标与展开箭头各自独立高亮
+    const hoverCss = (sel) => {
+      for (const sheet of document.styleSheets) {
+        let rules;
+        try {
+          rules = sheet.cssRules;
+        } catch (e) {
+          continue;
+        }
+        for (const r of rules) {
+          if (r.selectorText === sel) return r.style;
+        }
+      }
+      return null;
+    };
+    const caretHoverRule = hoverCss('.caret:hover');
+    const iconHoverRule = hoverCss('.icon-btn:hover:not(:disabled)');
+    assert('caretOwnHoverRule', !!caretHoverRule && caretHoverRule.background !== '', caretHoverRule && caretHoverRule.background);
+    assert('iconOwnHoverRule', !!iconHoverRule && iconHoverRule.background !== '', iconHoverRule && iconHoverRule.background);
+    assert('noGroupHoverRule', hoverCss('.tb-group:hover') === null);
 
     // 双页提示只说「双页视图」
     App.viewer.setTwoUp(false);

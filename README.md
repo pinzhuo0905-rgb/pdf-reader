@@ -89,8 +89,9 @@ features missing. No ads, no account, no network — it works offline, and even 
   window — not a single extra pixel
 - **Tabs**: open several PDFs at once, drag to reorder, tear out into a separate window
   (see [interaction notes](docs/tabs-and-sidebar.md))
-- **Contents sidebar**: `☰` in the top-left opens PDF bookmarks (outline) and page thumbnails, with the
-  current page outlined in blue
+- **Contents sidebar**: `☰` in the top-left slides out PDF bookmarks (outline) and page thumbnails, with the
+  current page outlined in blue. It **floats over the page** instead of shrinking it, so the document never
+  reflows when it opens
 - **Text selection and copy**: drag-select, double-click a word, `Ctrl+A`, right-click copy
 - Full-text search: highlighted hits, orange marker on the current hit, previous/next, match counter
 - Printing, document properties

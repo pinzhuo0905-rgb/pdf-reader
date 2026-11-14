@@ -12,9 +12,20 @@
     await sleep(900);
   }
   App.tabs.createBlank(false); // 第三个标签页：新标签页
-  App.ui.toggleSidebar(); // 展开目录
-  await sleep(1500);
+  App.ui.toggleSidebar(); // 展开目录（浮层）
+  await sleep(120);
+  // 隐藏窗口里 CSS 动画不推进，截图前快进到终态
+  document.getElementById('sidebar').getAnimations().forEach((a) => {
+    try { a.finish(); } catch (e) {}
+  });
+  await sleep(1200);
   App.viewer.scrollToPage(1, false);
-  await sleep(500);
+  // 等目标页真正画出来再截图，否则可能截到空白画布
+  for (let i = 0; i < 60; i++) {
+    const p = App.state.pages[1];
+    if (p && p.rendered) break;
+    await sleep(100);
+  }
+  await sleep(600);
   return { scene: 'tabs', tabs: App.tabs.list.length };
 })();
