@@ -989,10 +989,7 @@
   App.annotate = {
     paint,
     bbox,
-    hitTest,
     attachInteractions,
-    moveAnnot,
-    wrapLines,
     openTextCreator,
     fitTextHeight,
     hideEraserCursor,

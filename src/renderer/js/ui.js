@@ -1210,7 +1210,6 @@
     toggleSidebar,
     copySelection,
     selectAllText,
-    openPath,
     showModal,
     updateZoom,
     refreshTexts,

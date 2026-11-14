@@ -185,14 +185,9 @@
     return getAnnots(pageId).find((a) => a.id === annotId) || null;
   }
 
-  function hasAnnots() {
-    for (const list of S().annots.values()) if (list.length) return true;
-    return false;
-  }
-
   App.state = createDocState();
   App.createDocState = createDocState;
   App.COLORS = COLORS;
   App.history = { push: pushHistory, reset: resetHistory, undo, redo, updateUndoButtons, snapshot };
-  App.annots = { get: getAnnots, add: addAnnot, remove: removeAnnot, find: findAnnot, has: hasAnnots };
+  App.annots = { get: getAnnots, add: addAnnot, remove: removeAnnot, find: findAnnot };
 })();

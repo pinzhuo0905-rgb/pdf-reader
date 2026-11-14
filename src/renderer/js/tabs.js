@@ -12,6 +12,7 @@
   };
 
   let drag = null; // { id, el, startX, startY, moved, ghost }
+  const pendingSlide = new Set(); // 刚创建、还没做滑出动画的标签 id
   let windowCount = 1; // 当前应用开了几个窗口（单标签时用来区分「移动窗口」和「合并」）
   let pendingActivate = null;
 
@@ -74,6 +75,8 @@
     };
     t.state.settings = App.settings;
     tabs.list.push(t);
+    // 只有真正「新增」的标签才滑出：启动时的第一个标签保持静态
+    if (tabs.list.length > 1) pendingSlide.add(t.id);
     App.viewer.createView(t);
     // 后台新建：不抢焦点，视图保持隐藏
     if (doActivate) activate(t.id);
@@ -282,6 +285,47 @@
     }
     fitTabs();
     updateScrollable();
+    if (pendingSlide.size) {
+      // 宽度要等 fitTabs 分配完 --tab-w 才准，所以放到最后再量
+      for (const el of strip.querySelectorAll('.tab')) {
+        if (!pendingSlide.has(el.dataset.id)) continue;
+        pendingSlide.delete(el.dataset.id);
+        slideInTab(el);
+      }
+    }
+  }
+
+  /**
+   * 新标签滑出：宽度 0 → 目标宽 + 轻微左移淡入。
+   * 缓动是多段的（先加速 → 减速 → 轻微回弹 → 收回），和侧栏/下拉菜单同一套手感。
+   */
+  function slideInTab(el) {
+    const w = Math.round(el.getBoundingClientRect().width);
+    if (!w || typeof el.animate !== 'function') return;
+    // .tab 有 min-width:72px，动画期间临时放开，否则宽度收不到 0
+    el.style.minWidth = '0px';
+    const anim = el.animate(
+      [
+        { width: '0px', opacity: 0, transform: 'translateX(-14px)', easing: 'cubic-bezier(.36,0,.66,1)' },
+        { width: w + 'px', opacity: 1, transform: 'translateX(0)', offset: 0.58, easing: 'cubic-bezier(.36,0,.66,1)' },
+        { width: Math.round(w * 1.02) + 'px', offset: 0.78, easing: 'cubic-bezier(.36,0,.66,1)' },
+        { width: w + 'px', opacity: 1, offset: 1 },
+      ],
+      { duration: 340, fill: 'both' }
+    );
+    const done = () => {
+      try {
+        anim.cancel();
+      } catch (e) {
+        /* 已结束 */
+      }
+      el.style.minWidth = '';
+      el.style.width = '';
+    };
+    anim.onfinish = done;
+    anim.oncancel = done;
+    // 兜底：窗口不可见时动画事件不会派发，靠定时器把内联样式收回来
+    setTimeout(done, 340 + 160);
   }
 
   /**
@@ -587,7 +631,6 @@
     init,
     list: tabs.list,
     active,
-    find,
     createBlank,
     activate,
     flushPending,

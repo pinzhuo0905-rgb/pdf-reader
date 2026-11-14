@@ -21,13 +21,14 @@ body {
   user-select: none;
 }
 
-/* 界面语言字体：中文宋体，英文 Times New Roman */
+/* 界面语言字体：中文用微软雅黑 UI（msyh.ttc 内的界面专用族），英文用 Segoe UI。
+   两者都是 Windows 自带字体，随系统升级；缺字时按后面的列表回退，不会出现方框 */
 body[data-lang='zh'] {
-  font-family: 'SimSun', '宋体', 'STSong', 'Songti SC', serif;
+  font-family: 'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
 }
 
 body[data-lang='en'] {
-  font-family: 'Times New Roman', Times, serif;
+  font-family: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, sans-serif;
 }
 
 #app {

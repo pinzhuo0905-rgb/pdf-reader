@@ -114,14 +114,19 @@
 
     /* ---------------- 3) 语言切换与字体 ---------------- */
     const zhFont = getComputedStyle(document.body).fontFamily;
-    assert('zhFontSimSun', /SimSun|宋体/i.test(zhFont), zhFont);
+    assert('zhFontYaHeiUI', /Microsoft YaHei UI/i.test(zhFont), zhFont);
+    assert(
+      'fontFamiliesInstalled',
+      document.fonts.check('13px "Microsoft YaHei UI"') && document.fonts.check('13px "Segoe UI"'),
+      [document.fonts.check('13px "Microsoft YaHei UI"'), document.fonts.check('13px "Segoe UI"')]
+    );
     const zhTitle = $('btn-more').title;
     App.i18n.setLang('en', { silent: true });
     await sleep(200);
     const enTitle = $('btn-more').title;
     const enFont = getComputedStyle(document.body).fontFamily;
     assert('langEnTitle', enTitle === 'More tools' && enTitle !== zhTitle, [zhTitle, enTitle]);
-    assert('langEnFontTimes', /Times New Roman/i.test(enFont), enFont);
+    assert('langEnFontSegoeUI', /Segoe UI/i.test(enFont), enFont);
     assert('langEnHtml', document.documentElement.lang === 'en', document.documentElement.lang);
     assert('langEnEditbar', $('eb-textedit').textContent.trim() === 'Edit text', $('eb-textedit').textContent.trim());
     assert('langEnSearch', $('search-input').placeholder === 'Search in document', $('search-input').placeholder);
@@ -131,7 +136,7 @@
     await sleep(200);
     assert('langZhTitle', $('btn-more').title === '更多工具', $('btn-more').title);
     assert('langZhEditbar', $('eb-textedit').textContent.trim() === '编辑文字', $('eb-textedit').textContent.trim());
-    assert('langZhFontBack', /SimSun|宋体/i.test(getComputedStyle(document.body).fontFamily));
+    assert('langZhFontBack', /Microsoft YaHei UI/i.test(getComputedStyle(document.body).fontFamily));
 
     /* ---------------- 4) 「更多工具」改成三个点 ---------------- */
     const moreSvg = $('btn-more').querySelector('svg');
@@ -424,6 +429,85 @@
       App.i18n.t('menu.langZh') === '中文' && App.i18n.t('menu.langEn') === 'English',
       [App.i18n.t('menu.langZh'), App.i18n.t('menu.langEn')]
     );
+
+    /* ---------------- 5.7) 适应宽度平滑缩放 / 新标签滑出 / 界面字体 ---------------- */
+
+    // 隐藏窗口里 rAF 不触发，用 setTimeout 顶上才能采到中间帧
+    const origRaf = window.requestAnimationFrame;
+    window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);
+    const pagesEl3 = $('views').querySelector('.view.active .pages');
+    const curScale = () => {
+      const m = pagesEl3.style.transform.match(/scale\(([\d.]+)\)/);
+      return m ? parseFloat(m[1]) : 1;
+    };
+
+    // A) 从 2.6 点「适应宽度」：应当是平滑缩小，不是一步到位
+    App.viewer.setZoom(2.6, 'custom');
+    await sleep(450);
+    const zBeforeFit = st().zoom;
+    $('btn-fit-width').click();
+    await sleep(90);
+    const zMidFit = st().zoom;
+    const fitSamples = [];
+    const tFit = performance.now();
+    for (let i = 0; i < 22; i++) {
+      await sleep(25);
+      fitSamples.push([Math.round(performance.now() - tFit), curScale()]);
+    }
+    await sleep(400);
+    const zAfterFit = st().zoom;
+    assert('fitWidthNotInstant', Math.abs(zMidFit - zBeforeFit) < 0.001, [+zBeforeFit.toFixed(3), +zMidFit.toFixed(3)]);
+    assert('fitWidthShrinks', zAfterFit < zBeforeFit - 0.3, [+zBeforeFit.toFixed(3), +zAfterFit.toFixed(3)]);
+    assert('fitWidthModeSet', st().zoomMode === 'fitWidth', st().zoomMode);
+
+    // 曲线：中段速度最大，最后还要再加速一次（不是一路减速）
+    // 只统计动画帧：落位后 transform 会被清掉，curScale() 会跳回 1，不能算进曲线
+    const fitCurve = fitSamples.filter((x) => x[0] <= 430 && x[1] < 0.999);
+    const fitDeltas = [];
+    for (let i = 1; i < fitCurve.length; i++) fitDeltas.push(Math.abs(fitCurve[i][1] - fitCurve[i - 1][1]));
+    const maxAt = fitDeltas.indexOf(Math.max(...fitDeltas));
+    const tailMin = Math.min(...fitDeltas.slice(-4));
+    const tailLast = fitDeltas[fitDeltas.length - 1];
+    assert('fitWidthCurveNotLinear', fitDeltas.length >= 8 && maxAt < fitDeltas.length * 0.7, {
+      maxAt,
+      n: fitDeltas.length,
+      curve: fitCurve.map((x) => x[1].toFixed(3)),
+    });
+    // 末段速度要比中后段的最低点更快 —— 这就是「再加速」
+    assert('fitWidthFinalPush', tailLast > tailMin * 1.4, {
+      tailLast: +tailLast.toFixed(4),
+      tailMin: +tailMin.toFixed(4),
+      deltas: fitDeltas.map((d) => +d.toFixed(4)),
+    });
+    assert('fitWidthTransformCleared', !pagesEl3.style.transform, pagesEl3.style.transform);
+
+    // 适应后页面宽度应贴合可视区（不再溢出）
+    const areaW = $('views').querySelector('.view.active .scroll-area').clientWidth;
+    const pageW = st().pages[0].el.getBoundingClientRect().width;
+    assert('fitWidthFitsViewport', pageW > areaW * 0.8 && pageW < areaW, [Math.round(pageW), areaW]);
+
+    window.requestAnimationFrame = origRaf;
+
+    // B) 新标签滑出：宽度 0 → 目标宽，多段缓动，结束后清掉内联样式
+    const tabsBefore = document.querySelectorAll('#tabstrip .tab').length;
+    $('tab-new').click();
+    await sleep(160);
+    const tabEls = [...document.querySelectorAll('#tabstrip .tab')];
+    const newTab = tabEls[tabEls.length - 1];
+    const slideAnim = newTab.getAnimations()[0];
+    const kf = slideAnim ? slideAnim.effect.getKeyframes() : [];
+    assert('tabSlideAnim', !!slideAnim && slideAnim.effect.getTiming().duration === 340, slideAnim && slideAnim.effect.getTiming().duration);
+    assert('tabSlideKeyframes', kf.length === 4 && kf[0].width === '0px' && Math.abs(kf[2].offset - 0.78) < 0.01, kf.map((k) => [k.offset, k.width]));
+    assert('tabSlideGrew', tabEls.length === tabsBefore + 1, [tabsBefore, tabEls.length]);
+    await sleep(600);
+    assert('tabSlideCleanup', !newTab.style.minWidth && newTab.getAnimations().length === 0, {
+      minWidth: newTab.style.minWidth,
+      anims: newTab.getAnimations().length,
+    });
+    const newTabW = Math.round(newTab.getBoundingClientRect().width);
+    assert('tabSlideFinalWidth', newTabW >= 72 && newTabW <= 208, newTabW);
+    App.tabs.close(newTab.dataset.id, true);
+    await sleep(250);
 
     /* ---------------- 6) 设置菜单里的语言开关 + 持久化 ---------------- */
     $('btn-settings').click();

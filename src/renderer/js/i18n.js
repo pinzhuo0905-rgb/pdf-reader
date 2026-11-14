@@ -496,8 +496,6 @@
   App.i18n = {
     t,
     setLang,
-    applyStatic,
-    DICT,
     get lang() {
       return lang;
     },

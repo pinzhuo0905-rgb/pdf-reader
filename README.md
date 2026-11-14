@@ -41,7 +41,7 @@ features missing. No ads, no account, no network — it works offline, and even 
 | No account, no cloud sync, no network requests at all | Rotate / delete / insert pages, with the PDF genuinely rebuilt on save |
 | Dark and light themes stay restrained and never fight the content | Home-grown **offline OCR**, automatic Chinese/English switching, scanned pages become selectable text |
 | Opens instantly: one exe, no runtime to install | 20+ shortcuts, context menus, thumbnails, full-text search, printing |
-| One-click Chinese/English UI (SimSun for Chinese, Times New Roman for English) | **Two-page view**, smooth Ctrl+wheel zoom, zoom slider |
+| One-click Chinese/English UI (Microsoft YaHei UI for Chinese, Segoe UI for English) | **Two-page view**, smooth Ctrl+wheel zoom, zoom slider |
 | The tab strip is only 38px tall | **Browser-style tabs**: drag to reorder, tear out into a separate window, independent state |
 | Sidebar appears on demand and takes no space otherwise | **Contents sidebar**: PDF bookmarks + page thumbnails, current page outlined |
 
@@ -67,7 +67,7 @@ features missing. No ads, no account, no network — it works offline, and even 
 
 ![Two-page view](docs/screenshots/09-twoup.png)
 
-**English UI** — switch language in Settings; English uses Times New Roman:
+**English UI** — switch language in Settings; the English UI uses Segoe UI:
 
 ![English UI](docs/screenshots/10-en.png)
 

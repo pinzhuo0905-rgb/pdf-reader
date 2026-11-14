@@ -269,23 +269,47 @@
     return S().twoUp ? Math.max(120, (w - TWO_UP_GAP) / 2) : w;
   }
 
-  function computeAutoZoom() {
+  /** 算出某个模式下的目标缩放，但不改 state（动画要从当前值出发） */
+  function autoZoomValue(mode) {
     const state = S();
     const first = state.pages[0];
-    if (!first) return;
+    if (!first) return null;
     const availW = availWidth();
     const availH = el.scroll.clientHeight - 40;
     let z;
-    if (state.zoomMode === 'fitPage') {
+    if (mode === 'fitPage') {
       z = Math.min(availW / first.wPt, availH / first.hPt);
-    } else if (state.zoomMode === 'custom') {
+    } else if (mode === 'custom') {
       z = state.zoom;
     } else {
       // auto / fitWidth：以当前页宽度适应
       const cur = state.pages[state.currentPage] || first;
       z = availW / cur.wPt;
     }
-    state.zoom = Math.max(0.15, Math.min(4, z));
+    return Math.max(0.15, Math.min(4, z));
+  }
+
+  function computeAutoZoom() {
+    const z = autoZoomValue(S().zoomMode);
+    if (z != null) S().zoom = z;
+  }
+
+  /**
+   * 「适应宽度 / 适应页面」的缓动：先加速 → 减速 → 最后再加速收进目标。
+   * 放大时峰值停在目标内侧（0.978），缩小时略微越过（1.022），
+   * 两种方向都不会让页面在动画中途超出视口宽度，避免横向滚动条一闪。
+   */
+  function easeFitZoom(k, growing) {
+    const peak = growing ? 0.978 : 1.022;
+    if (k >= 0.78) {
+      const t = (k - 0.78) / 0.22;
+      return peak + (1 - peak) * easeInOutQuad(t);
+    }
+    return peak * easeInOutQuad(k / 0.78);
+  }
+
+  function easeInOutQuad(t) {
+    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
   }
 
   const clampZoom = (z) => Math.max(0.15, Math.min(5, z));
@@ -312,14 +336,15 @@
     animateZoom(S().zoom / 1.15, centerAnchor(), 'custom');
   }
   function fitWidth() {
-    S().zoomMode = 'fitWidth';
-    computeAutoZoom();
-    animateZoom(S().zoom, centerAnchor(), 'fitWidth', 0);
+    const to = autoZoomValue('fitWidth');
+    if (to == null) return;
+    // 当前值到目标值平滑过渡：画面过大就慢慢缩小，过小就慢慢放大
+    animateZoom(to, centerAnchor(), 'fitWidth', 420, easeFitZoom);
   }
   function fitPage() {
-    S().zoomMode = 'fitPage';
-    computeAutoZoom();
-    animateZoom(S().zoom, centerAnchor(), 'fitPage', 0);
+    const to = autoZoomValue('fitPage');
+    if (to == null) return;
+    animateZoom(to, centerAnchor(), 'fitPage', 420, easeFitZoom);
   }
 
   /** 视口中心的锚点（屏幕坐标），用于键盘/按钮缩放 */
@@ -373,7 +398,7 @@
     el.scroll.scrollTop += r.top + norm.ny * r.height - anchor.y;
   }
 
-  function animateZoom(target, anchor, mode, duration) {
+  function animateZoom(target, anchor, mode, duration, ease) {
     const st = S();
     const to = clampZoom(target);
     if (!el.pages) {
@@ -395,10 +420,14 @@
         ox: a.x - rect.left,
         oy: a.y - rect.top,
         mode: null,
+        dur: 150,
+        ease: easeOutCubic,
       };
     }
     zoomAnim.anchor = anchor || zoomAnim.anchor;
     zoomAnim.mode = mode || zoomAnim.mode;
+    zoomAnim.dur = duration === undefined ? 150 : duration;
+    zoomAnim.ease = ease || easeOutCubic;
     zoomAnim.target = to;
     if (duration === 0) {
       zoomAnim.cur = to;
@@ -414,15 +443,14 @@
     const anim = zoomAnim;
     zoomAnim.timer = setTimeout(() => {
       if (zoomAnim === anim) finishZoomAnim();
-    }, 260);
+    }, zoomAnim.dur + 120);
   }
 
   function zoomStep(now) {
     const a = zoomAnim;
     if (!a) return;
-    const dur = 150;
-    const k = Math.min(1, (now - a.t0) / dur);
-    const e = 1 - Math.pow(1 - k, 3); // easeOutCubic
+    const k = Math.min(1, (now - a.t0) / a.dur);
+    const e = a.ease(k, a.target > a.from);
     a.cur = a.from + (a.target - a.from) * e;
     applyPreview(a.cur, S().zoom, a);
     notifyZoomPreview(a.cur);
@@ -432,6 +460,10 @@
       return;
     }
     a.raf = requestAnimationFrame(zoomStep);
+  }
+
+  function easeOutCubic(k) {
+    return 1 - Math.pow(1 - k, 3);
   }
 
   function notifyZoomPreview(z) {
@@ -518,11 +550,6 @@
     clearTimeout(w.timer);
     if (w.step) clearTimeout(w.step);
     commitZoom(clampZoom(w.target), w.anchor, 'custom');
-  }
-
-  /** 兼容旧接口：按屏幕坐标缩放 */
-  function zoomAt(clientX, clientY, factor) {
-    wheelZoomBy(factor, { x: clientX, y: clientY }, false);
   }
 
   /** 切换标签页/窗口尺寸变化前，把未落位的缩放先收尾，避免 transform 残留 */
@@ -1434,21 +1461,13 @@
     buildOutline,
     isLoading,
     load,
-    layout,
     setZoom,
     zoomIn,
     zoomOut,
     zoomTo,
-    zoomAt,
-    wheelZoomBy,
-    flushZoom,
-    animateZoom,
     setTwoUp,
-    notifyZoom,
     fitWidth,
     fitPage,
-    renderVisible,
-    renderPage,
     refreshOverlays,
     updatePageIndicator,
     scrollToPage,
@@ -1457,7 +1476,6 @@
     rotatePage,
     deletePage,
     insertBlankPage,
-    relayoutAfterPageChange,
     setPageModel,
     toggleSidebar,
     buildThumbs,

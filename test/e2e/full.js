@@ -15,7 +15,8 @@
     runtimeErrors.push('rejection: ' + String((e.reason && e.reason.message) || e.reason))
   );
   const zoom = () => S().zoom;
-  const waitZoom = () => sleep(340); // 缩放动画 150ms + 兜底 260ms
+  // 按钮缩放 150ms、适应宽度/页面 420ms；隐藏窗口里靠兜底定时器（时长+120ms）落位
+  const waitZoom = () => sleep(620);
   const activeView = () => $('views').querySelector('.view.active');
   const activePages = () => activeView() && activeView().querySelector('.pages');
 

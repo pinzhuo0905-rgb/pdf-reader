@@ -23,10 +23,6 @@
     }, true);
   }
 
-  function isOpen() {
-    return !!active;
-  }
-
   /**
    * @param {object} o
    *  page       页面对象（page.el 作为定位父元素）
@@ -326,14 +322,9 @@
   App.textedit = {
     init,
     open,
-    close,
     commit,
-    commitIfOpen,
     cancel,
-    isOpen,
     startAt,
     editExisting,
-    itemAt,
-    sampleRegion,
   };
 })();
