@@ -400,6 +400,15 @@
     assert('iconOwnHoverRule', !!iconHoverRule && iconHoverRule.background !== '', iconHoverRule && iconHoverRule.background);
     assert('noGroupHoverRule', hoverCss('.tb-group:hover') === null);
 
+    // 工具栏上每一种按钮都必须有自己的悬停反馈（带文字的「绘制」曾经漏掉）
+    const hoverGaps = ['.icon-btn:hover:not(:disabled)', '.labeled-btn:hover:not(:disabled)', '.caret:hover', '.text-btn:hover'].filter(
+      (sel) => {
+        const r = hoverCss(sel);
+        return !r || r.background === '';
+      }
+    );
+    assert('allToolbarButtonsHoverable', hoverGaps.length === 0, hoverGaps);
+
     // 双页提示只说「双页视图」
     App.viewer.setTwoUp(false);
     await sleep(200);

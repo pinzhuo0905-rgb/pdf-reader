@@ -37,6 +37,7 @@ body[data-lang='en'] {
   --icon-dim: #8a8a8a;
   --btn-hover: #e4e4e4;
   --btn-active: #d5d5d5;
+  --btn-active-hover: #c6c6c6;
   --accent: #0072c9;
   --accent-soft: #e1f0fb;
   --canvas: #e6e6e6;
@@ -70,6 +71,7 @@ body[data-lang='en'] {
   --icon-dim: #8f8f8f;
   --btn-hover: rgba(255, 255, 255, 0.15);
   --btn-active: #4c4c4c;
+  --btn-active-hover: #5a5a5a;
   --accent: #4ba3e3;
   --accent-soft: #1e3a4d;
   --canvas: #1f1f1f;
@@ -280,6 +282,22 @@ body[data-lang='en'] {
   font-size: 13px;
   font-family: inherit;
   cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease;
+}
+
+.labeled-btn:hover:not(:disabled) {
+  background: var(--btn-hover);
+}
+
+.labeled-btn:active:not(:disabled) {
+  background: var(--btn-active);
+}
+
+/* 工具已选中时整组是 --btn-active 底色，悬停要再深一档，否则看起来反而变浅 */
+.tb-group.active .labeled-btn:hover:not(:disabled),
+.tb-group.active .icon-btn:hover:not(:disabled),
+.tb-group.active .caret:hover {
+  background: var(--btn-active-hover);
 }
 
 .tb-group.labeled .caret {
