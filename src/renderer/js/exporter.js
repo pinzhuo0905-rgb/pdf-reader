@@ -1,5 +1,7 @@
 /* 导出：把标注与页面操作写入 PDF 文件（pdf-lib） */
 (function () {
+  'use strict';
+
   const App = (window.App = window.App || {});
   const S = () => App.state;
 

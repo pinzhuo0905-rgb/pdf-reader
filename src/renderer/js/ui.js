@@ -1,5 +1,7 @@
 /* 界面交互：工具栏、菜单、搜索、保存、打印、设置 */
 (function () {
+  'use strict';
+
   const App = (window.App = window.App || {});
   const S = () => App.state;
   const $ = (id) => document.getElementById(id);
@@ -255,7 +257,7 @@
     setTitle();
   }
 
-  /** 没有打开文档时禁用依赖文档的按钮（与 Edge 一致） */
+  /** 没有打开文档时禁用依赖文档的按钮 */
   function setDocState(hasDoc) {
     for (const id of DOC_BUTTONS) {
       const el = $(id);
@@ -983,7 +985,7 @@
     showModal(
       t('about.title'),
       `<div style="display:flex;gap:14px;align-items:center;margin-bottom:10px">
-        <img src="assets/pdf-icon-256.png" style="width:56px;height:56px"/>
+        <img src="assets/pdf-icon-256.png" alt="" style="width:56px;height:56px"/>
         <div><div style="font-size:15px;font-weight:600">PDF Reader</div>
         <div style="color:var(--text-dim);font-size:12px">${t('about.version')} ${v.app}</div></div>
       </div>

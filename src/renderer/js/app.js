@@ -1,4 +1,6 @@
 /* 启动 */
+'use strict';
+
 window.addEventListener('DOMContentLoaded', async () => {
   App.viewer.init();
   App.textedit.init();

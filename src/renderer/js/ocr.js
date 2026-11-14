@@ -1,5 +1,7 @@
 /* OCR 文字识别：把页面或框选区域渲染成位图，交给主进程的自研 OCR 引擎 */
 (function () {
+  'use strict';
+
   const App = (window.App = window.App || {});
   const S = () => App.state;
   const $ = (id) => document.getElementById(id);

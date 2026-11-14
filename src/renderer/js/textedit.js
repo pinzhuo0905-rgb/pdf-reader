@@ -5,8 +5,14 @@
  * 回车 / 点击别处 = 提交，Esc = 取消。
  */
 (function () {
+  'use strict';
+
   const App = (window.App = window.App || {});
   const S = () => App.state;
+
+  // 打开编辑器后 input.focus() 可能把页面滚到可见位置，这个滚动是「自己造成的」，
+  // 不能触发「滚动即落笔」，否则编辑器会刚出现就被关掉。
+  let ignoreScrollUntil = 0;
 
   let active = null; // {page, box, input, onCommit, onCancel, closed}
 
@@ -98,6 +104,7 @@
       }, 0);
     });
 
+    ignoreScrollUntil = performance.now() + 400;
     setTimeout(() => {
       input.focus();
       // 光标放到末尾，方便直接在原文后面继续改
@@ -130,7 +137,9 @@
   }
 
   function commitIfOpen() {
-    if (active) commit();
+    if (!active) return;
+    if (performance.now() < ignoreScrollUntil) return;
+    commit();
   }
 
   function cancel() {

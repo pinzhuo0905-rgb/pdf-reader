@@ -1,5 +1,7 @@
-/* 界面多语言：中文（宋体）/ English（Times New Roman） */
+/* 界面多语言：中文（Microsoft YaHei UI）/ English（Segoe UI） */
 (function () {
+  'use strict';
+
   const App = (window.App = window.App || {});
 
   const ZH = {
@@ -190,7 +192,7 @@
     'about.title': '关于',
     'about.version': '版本',
     'about.desc':
-      '界面与交互参照 Microsoft Edge 内置 PDF 阅读器设计，支持文本选择/复制、高亮、绘制、文本框，并提供 PDF 内容编辑（文字修改、插入文本/图片/形状、涂改遮盖、页面管理）与自研 OCR 文字识别（DB 文本检测 + CRNN/CTC 识别，纯 JS 实现，中英双语自动切换，可把扫描页转为可复制文本）。',
+      '支持文本选择/复制、高亮、绘制、文本框，并提供 PDF 内容编辑（文字修改、插入文本/图片/形状、涂改遮盖、页面管理）与自研 OCR 文字识别（DB 文本检测 + CRNN/CTC 识别，纯 JS 实现，中英双语自动切换，可把扫描页转为可复制文本）。',
     'close.title': '保存更改？',
     'close.desc': '文档中有尚未保存的修改，是否在关闭前保存？',
     'close.multiTitle': '有未保存的修改',
@@ -411,7 +413,7 @@
     'about.title': 'About',
     'about.version': 'Version',
     'about.desc':
-      'The UI follows the Microsoft Edge built-in PDF reader, with text selection/copy, highlight, drawing and text boxes, plus PDF content editing (edit text, insert text/images/shapes, whiteout, page management) and a self-built OCR pipeline (DB text detection + CRNN/CTC recognition in pure JS, auto Chinese/English, turning scanned pages into copyable text).',
+      'Text selection/copy, highlight, drawing and text boxes, plus PDF content editing (edit text, insert text/images/shapes, whiteout, page management) and a self-built OCR pipeline (DB text detection + CRNN/CTC recognition in pure JS, auto Chinese/English, turning scanned pages into copyable text).',
     'close.title': 'Save changes?',
     'close.desc': 'This document has unsaved changes. Do you want to save before closing?',
     'close.multiTitle': 'Unsaved changes',
@@ -478,6 +480,9 @@
     });
     scope.querySelectorAll('[data-i18n-ph]').forEach((el) => {
       el.placeholder = t(el.getAttribute('data-i18n-ph'));
+    });
+    scope.querySelectorAll('[data-i18n-aria]').forEach((el) => {
+      el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria')));
     });
   }
 

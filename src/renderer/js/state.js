@@ -1,5 +1,7 @@
 /* 全局状态与数据模型：每个标签页各自持有一份文档状态 */
 (function () {
+  'use strict';
+
   const App = (window.App = window.App || {});
 
   const COLORS = {

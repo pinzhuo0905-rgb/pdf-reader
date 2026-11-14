@@ -1,5 +1,7 @@
 /* 标注：绘制、命中测试、鼠标交互 */
 (function () {
+  'use strict';
+
   const App = (window.App = window.App || {});
   const S = () => App.state;
   const tr = (k, v) => window.App.i18n.t(k, v);

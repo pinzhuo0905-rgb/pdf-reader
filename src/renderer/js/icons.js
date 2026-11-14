@@ -1,5 +1,7 @@
-/* Edge 风格线性图标集（20x20 视口，1.4px 描边） */
+/* 线性图标集（20x20 视口，1.4px 描边） */
 (function () {
+  'use strict';
+
   const P = (d, extra = '') =>
     `<path d="${d}" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" ${extra}/>`;
 

@@ -466,18 +466,20 @@
     const fitDeltas = [];
     for (let i = 1; i < fitCurve.length; i++) fitDeltas.push(Math.abs(fitCurve[i][1] - fitCurve[i - 1][1]));
     const maxAt = fitDeltas.indexOf(Math.max(...fitDeltas));
-    const tailMin = Math.min(...fitDeltas.slice(-4));
-    const tailLast = fitDeltas[fitDeltas.length - 1];
     assert('fitWidthCurveNotLinear', fitDeltas.length >= 8 && maxAt < fitDeltas.length * 0.7, {
       maxAt,
       n: fitDeltas.length,
       curve: fitCurve.map((x) => x[1].toFixed(3)),
     });
-    // 末段速度要比中后段的最低点更快 —— 这就是「再加速」
-    assert('fitWidthFinalPush', tailLast > tailMin * 1.4, {
-      tailLast: +tailLast.toFixed(4),
-      tailMin: +tailMin.toFixed(4),
-      deltas: fitDeltas.map((d) => +d.toFixed(4)),
+
+    // 「再加速」的确定性判据：缩小方向会略微越过目标再收回来（回弹），
+    // 这比逐帧比较末段速度稳定得多（后者受采样抖动影响）
+    const targetRatio = zAfterFit / zBeforeFit;
+    const minRatio = Math.min(...fitCurve.map((x) => x[1]));
+    assert('fitWidthBouncesBack', minRatio < targetRatio - 0.001, {
+      minRatio: +minRatio.toFixed(4),
+      target: +targetRatio.toFixed(4),
+      curve: fitCurve.map((x) => x[1].toFixed(3)),
     });
     assert('fitWidthTransformCleared', !pagesEl3.style.transform, pagesEl3.style.transform);
 

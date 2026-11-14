@@ -1,5 +1,7 @@
 /* 多标签页：标签条、切换、关闭、拖拽排序与拖出为独立窗口 */
 (function () {
+  'use strict';
+
   const App = (window.App = window.App || {});
   const $ = (id) => document.getElementById(id);
   // 注意：本文件里 t 常被用作标签页变量，i18n 统一走 tr()

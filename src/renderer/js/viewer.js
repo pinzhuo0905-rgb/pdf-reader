@@ -1,5 +1,7 @@
 /* PDF 渲染视图：加载、布局、缩放、懒渲染、文本层、搜索、页面操作 */
 (function () {
+  'use strict';
+
   const App = (window.App = window.App || {});
   const S = () => App.state;
   const tr = (k, v) => window.App.i18n.t(k, v);
