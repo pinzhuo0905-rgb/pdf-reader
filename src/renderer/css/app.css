@@ -106,82 +106,109 @@ body[data-lang='en'] {
   height: 48px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 8px;
+  padding: 0 6px;
   background: var(--tb-bg);
   border-bottom: 1px solid var(--tb-border);
   z-index: 30;
   -webkit-app-region: no-drag;
 }
 
-/* 三段式 flex 布局：以前中间那段是 absolute 定位居中，
-   窗口一窄左边就会压到它身上（按钮叠在一起）。改成真正的三栏，
-   空间不够时按下面的断点逐级精简，永远不会重叠。 */
+/* 三段式布局 + 整条横向滚动。
+   最早中间那段是 absolute 居中，窗口一窄左边就压上去；后来改成三段 flex
+   又靠断点隐藏按钮腾地方，仍然会挤。现在把三段放进可横向滚动的容器：
+   空间不够时右侧溢出，用两端箭头（或触控板横滑）访问，
+   功能键一个都不用藏，也不会再重叠。 */
+.tb-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(auto, 1fr) auto minmax(auto, 1fr);
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.tb-scroll::-webkit-scrollbar {
+  height: 0;
+}
+
 .tb-left,
+.tb-center,
 .tb-right {
   display: flex;
   align-items: center;
   gap: 1px;
-  flex: 0 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
+  min-width: max-content;
 }
 
-.tb-right {
-  justify-content: flex-end;
+.tb-left {
+  justify-self: start;
 }
 
 .tb-center {
+  justify-self: center;
+}
+
+.tb-right {
+  justify-self: end;
+}
+
+/* 两端箭头：只有对应方向还能滚时才可见。
+   始终占位（用 visibility 而非 display），这样箭头出现/消失不会改变
+   滚动区的宽度，否则会「出现箭头 → 可视区变窄 → 滚动位置被夹回 → 箭头又消失」地抖。 */
+.tb-nav {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 1px;
-  margin: 0 auto;
+  justify-content: center;
+  width: 22px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: var(--tb-bg);
+  color: var(--icon-dim);
+  cursor: pointer;
+  z-index: 2;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease, background-color 0.12s ease;
 }
 
-/* 窄窗口：先去掉「绘制」的文字标签，再收分隔线和滑块 */
+.toolbar.can-prev .tb-nav.prev,
+.toolbar.can-next .tb-nav.next {
+  visibility: visible;
+  opacity: 1;
+}
+
+.tb-nav:hover {
+  color: var(--icon);
+  background: var(--btn-hover);
+}
+
+.tb-nav:active {
+  background: var(--btn-active);
+}
+
+.tb-nav.prev {
+  box-shadow: 7px 0 9px -7px rgba(0, 0, 0, 0.35);
+}
+
+.tb-nav.next {
+  box-shadow: -7px 0 9px -7px rgba(0, 0, 0, 0.35);
+}
+
+/* 窄窗口只精简「绘制」的文字标签（纯装饰），其余功能键一律保留，靠滚动访问 */
 @media (max-width: 1320px) {
   .labeled-btn .lbl {
     display: none;
   }
   .labeled-btn {
     padding: 0 7px;
-  }
-}
-
-@media (max-width: 1220px) {
-  .toolbar .sep {
-    display: none;
-  }
-  .toolbar {
-    gap: 4px;
-  }
-}
-
-@media (max-width: 1120px) {
-  .zoom-range {
-    width: 68px;
-  }
-  .icon-btn {
-    width: 30px;
-  }
-  .icon-btn.sm {
-    width: 26px;
-  }
-}
-
-@media (max-width: 1000px) {
-  .zoom-range {
-    display: none;
-  }
-  .page-box .of {
-    display: none;
-  }
-}
-
-@media (max-width: 900px) {
-  #btn-print,
-  #btn-saveas {
-    display: none;
   }
 }
 

@@ -16,6 +16,7 @@
   function init() {
     Icons.hydrate();
     initWindowControls();
+    initToolbarScroll();
 
     // 工具栏：左上角汉堡按钮展开「目录」侧栏
     $('btn-menu').onclick = () => toggleSidebar();
@@ -159,6 +160,66 @@
     'btn-more',
     'btn-editpdf',
   ];
+
+  /* ============================ 工具栏横向滚动 ============================ */
+
+  /**
+   * 窗口变窄时整条工具栏横向滚动。
+   *
+   * 之前是靠断点隐藏按钮腾地方（先藏滑块、再藏打印/另存为），但窗口小到一定程度
+   * 「更多工具」和缩放组还是会压在一起。现在功能键全保留，溢出部分靠两端箭头
+   * 或触控板横滑访问；箭头只在对应方向还能滚时才出现，滚到头自动让位。
+   */
+  function initToolbarScroll() {
+    const bar = $('toolbar');
+    const box = $('tb-scroll');
+    const prev = $('tb-prev');
+    const next = $('tb-next');
+    if (!bar || !box || !prev || !next) return;
+
+    const sync = () => {
+      const max = box.scrollWidth - box.clientWidth;
+      bar.classList.toggle('can-prev', box.scrollLeft > 1);
+      bar.classList.toggle('can-next', max > 1 && box.scrollLeft < max - 1);
+    };
+
+    const step = (dir) => {
+      // 一次滚过半屏：既能看到新内容，也不会因为步长太大而失去位置感
+      const span = Math.max(160, Math.round(box.clientWidth * 0.6));
+      const max = box.scrollWidth - box.clientWidth;
+      const from = box.scrollLeft;
+      const target = Math.max(0, Math.min(max, from + dir * span));
+      if (Math.abs(target - from) < 1) return;
+      box.scrollTo({ left: target, behavior: 'smooth' });
+      // 平滑滚动在窗口被遮挡 / 渲染被节流时不会推进，这时直接落位，别让按钮像失灵
+      clearTimeout(step.timer);
+      step.timer = setTimeout(() => {
+        if (Math.abs(box.scrollLeft - from) < 1) box.scrollLeft = target;
+      }, 260);
+    };
+
+    prev.onclick = () => step(-1);
+    next.onclick = () => step(1);
+    box.addEventListener('scroll', sync, { passive: true });
+
+    // 鼠标滚轮竖着滚也能带动工具栏横移；触控板横向滑动由浏览器原生处理
+    box.addEventListener(
+      'wheel',
+      (e) => {
+        if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+        if (box.scrollWidth <= box.clientWidth + 1) return;
+        const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+        box.scrollLeft += delta;
+        e.preventDefault();
+      },
+      { passive: false }
+    );
+
+    // 窗口缩放、语言切换（按钮文字变宽）都要重算箭头显隐
+    if (typeof ResizeObserver === 'function') new ResizeObserver(sync).observe(box);
+    window.addEventListener('resize', sync);
+    sync();
+  }
 
   /* ============================ 自绘窗口按钮 ============================ */
 

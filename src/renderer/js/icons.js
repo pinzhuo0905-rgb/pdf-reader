@@ -60,6 +60,8 @@
     settings: `<path d="M8.55 2.9h2.9l.38 1.86c.46.16.9.37 1.3.62l1.74-.72 1.45 2.5-1.4 1.3c.05.34.08.7.08 1.04 0 .34-.03.7-.08 1.04l1.4 1.3-1.45 2.5-1.74-.72c-.4.25-.84.46-1.3.62l-.38 1.86h-2.9l-.38-1.86a5.9 5.9 0 0 1-1.3-.62l-1.74.72-1.45-2.5 1.4-1.3A5.9 5.9 0 0 1 4.9 10c0-.34.03-.7.08-1.04l-1.4-1.3 1.45-2.5 1.74.72c.4-.25.84-.46 1.3-.62z" fill="none" stroke="currentColor" stroke-width="${SW}" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.2" fill="none" stroke="currentColor" stroke-width="${SW}"/>`,
     chevronDown: P('M6.4 8.5 10 12.1l3.6-3.6'),
     chevronUp: P('M6.4 11.5 10 7.9l3.6 3.6'),
+    chevronLeft: P('M11.6 6.4 7.9 10l3.7 3.6'),
+    chevronRight: P('M8.4 6.4 12.1 10l-3.7 3.6'),
     close: P('M5.8 5.8 14.2 14.2M14.2 5.8 5.8 14.2'),
     cursor: `<path d="M5.9 3.6 7.1 15.2l2.5-2.9 2 3.4 1.6-.9-2-3.3 3.7-.4z" fill="none" stroke="currentColor" stroke-width="${SW}" stroke-linejoin="round"/>`,
     editText: `${P('M3.9 5.9h7.4M7.6 5.9v8.2M5.9 14.1h3.4')}${P('m12.4 16.4.4-2 3.4-3.4 1.6 1.6-3.4 3.4z')}`,
