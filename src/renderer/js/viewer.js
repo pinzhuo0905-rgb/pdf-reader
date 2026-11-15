@@ -26,6 +26,9 @@
   const PAD_X = 24;
   /** 双页视图两页之间的横向间距 */
   const TWO_UP_GAP = 10;
+  /** 页面容器上内边距与单页纵向间距（与 app.css 的 .pages 保持一致） */
+  const PAD_TOP = 14;
+  const PAGE_GAP = 14;
 
   /* ------------------------------- 初始化 ------------------------------- */
   function init() {
@@ -322,9 +325,8 @@
     runZoomHooks();
     state.zoom = clampZoom(z);
     if (mode) state.zoomMode = mode;
-    markInteracting();
     const anchor = captureAnchor();
-    layout();
+    layout(true);
     restoreAnchor(anchor);
     notifyZoom();
   }
@@ -378,6 +380,9 @@
     if (!el.pages || !base) return;
     const ratio = target / base;
     el.pages.style.transformOrigin = origin.ox + 'px ' + origin.oy + 'px';
+    // previewing：缩放动画期间只合成页面位图，文本层/标注层/阴影都不参与重绘
+    // （一页 500 个 span，每变一次 transform 都要重新光栅化，那才是缩放一顿一顿的主因）
+    el.pages.classList.add('previewing');
     el.pages.style.transform = 'scale(' + ratio.toFixed(4) + ')';
   }
 
@@ -385,6 +390,7 @@
     if (!el.pages) return;
     el.pages.style.transform = '';
     el.pages.style.transformOrigin = '';
+    el.pages.classList.remove('previewing');
   }
 
   /** 当前锚点在页面里的归一化位置（缩放前后不变，用于落位后还原视点） */
@@ -630,19 +636,26 @@
     for (const p of S().pages) createPageEl(p);
   }
 
+  /** 按当前缩放写死这一页的 CSS 尺寸 */
+  function applyPageSize(p) {
+    if (!p.el) return;
+    const z = S().zoom;
+    p.el.style.width = p.wPt * z + 'px';
+    p.el.style.height = p.hPt * z + 'px';
+  }
+
   function createPageEl(p) {
     const div = document.createElement('div');
     div.className = 'page';
     div.dataset.id = p.id;
-    div.style.width = p.wPt * S().zoom + 'px';
-    div.style.height = p.hPt * S().zoom + 'px';
+    p.el = div;
+    applyPageSize(p);
 
     const textLayer = document.createElement('div');
     textLayer.className = 'textLayer';
     div.appendChild(textLayer);
     el.pages.appendChild(div);
 
-    p.el = div;
     p.canvas = null;
     p.overlay = null;
     p.textLayer = textLayer;
@@ -650,11 +663,14 @@
   }
 
   /**
-   * 单页位图预算（像素）。zoom 2.55 × dpr 2 时一页是 2428×3303 ≈ 8MP，
-   * 光栅化慢、占内存也多；超过预算就按比例降采样，画布仍按 CSS 尺寸铺满，
-   * 肉眼看不出差别（等效 dpr 仍有 1.4 以上）。
+   * 单页位图预算（像素）。
+   *
+   * 2.55 倍缩放 + 2 倍屏时一页是 2428×3303 ≈ 8MP，正好按屏幕物理像素渲染。
+   * 之前把这个上限压到 4.2MP 想省时间，结果等效 dpr 只有 1.2–1.45，
+   * 2 倍屏上字明显发虚 —— 清晰度换速度不划算，这里按真实 dpr 给足。
+   * 只有缩放到 3 倍以上、单页超过 8MP 时才降采样。
    */
-  const MAX_BITMAP_PX = 4.2e6;
+  const MAX_BITMAP_PX = 8e6;
 
   /** 滚动中的临时分辨率（相对 CSS 像素的倍数）：1 表示 1:1，约 2MP，滚完再补高清 */
   const QUICK_SCALE = 1;
@@ -709,9 +725,6 @@
     canvas.className = 'base';
     const overlay = document.createElement('canvas');
     overlay.className = 'overlay';
-    const z = S().zoom;
-    canvas.style.width = p.wPt * z + 'px';
-    canvas.style.height = p.hPt * z + 'px';
     if (p.el) {
       p.el.insertBefore(canvas, p.textLayer || null);
       p.el.insertBefore(overlay, p.textLayer || null);
@@ -739,26 +752,26 @@
     p.rendered = false;
   }
 
-  function layout() {
+  /**
+   * 按当前缩放重排所有页。
+   *
+   * @param {boolean} [deferRender] 缩放用：不立刻重画，等手停下来再画一次。
+   *   连续点 +/- 时每次落位都重画一页 8MP 位图，主线程被反复占满；
+   *   延迟合并之后，点五下也只画最后那一次。
+   */
+  function layout(deferRender) {
     const z = S().zoom;
     let resized = false;
+    // 第一趟只写尺寸、不读布局：浏览器会在需要时把这几百次写合并成一次重排
     for (const p of S().pages) {
       if (!p.el) continue;
       const prev = p._layoutZoom || 0;
       const changed = !prev || Math.abs(prev - z) / z > 0.03;
       p.el.style.width = p.wPt * z + 'px';
       p.el.style.height = p.hPt * z + 'px';
-      // 画布始终铺满页面框：否则页面先变大、画布还没跟上时会露出白边
-      if (p.canvas) {
-        p.canvas.style.width = p.wPt * z + 'px';
-        p.canvas.style.height = p.hPt * z + 'px';
-      }
       if (changed) {
         // 只有尺寸真的变了才重排；旧位图先按新尺寸拉伸显示，等新位图画好再替换
         p._layoutZoom = z;
-        sizeOverlay(p);
-        // 标注层刚被清空，立刻按新尺寸重画，避免缩放时标注闪一下消失
-        drawOverlay(p);
         p.rendered = false;
         // 文本层坐标是按当前缩放算的，缩放一变必须作废，否则点选会命中错的行
         p.textItems = null;
@@ -766,9 +779,56 @@
       }
     }
     applySpreadWidth(z);
+
+    // 不在这里 indexPages()：刚写完几百个尺寸就同步读 offsetTop，
+    // 会把「写样式 + 强制整篇重排 + 读 553 个位置」压在同一个任务里（实测 78ms/次）。
+    // 标记失效即可，索引留到下一次滚动/渲染时补建 —— 那时布局已经在帧间稳定，
+    // 读 offsetTop 只是读缓存，不再触发重排。
+    S()._indexed = false;
+
+    // 第二趟才碰覆盖层，而且只处理「有画布的页」（其余页画布早就拆掉了，
+    // overlay 也是 null），所以这里虽然遍历全部页，实际只有 2–5 次画布操作
+    if (resized) {
+      for (const p of S().pages) {
+        if (!p.overlay) continue;
+        // 标注层刚被清空，立刻按新尺寸重画，避免缩放时标注闪一下消失
+        sizeOverlay(p);
+        drawOverlay(p);
+      }
+    }
+
+    if (deferRender) scheduleZoomRender();
+    else renderVisible(false);
+  }
+
+  /** 索引失效时补建（调用点都在布局稳定之后，读 offsetTop 不会触发重排） */
+  function ensureIndex() {
+    const st = S();
+    if (st._indexed) return;
+    // 缩放预览期间 .pages 上有 transform，位置是假的，等落位再建
+    if (el.pages && el.pages.style.transform) return;
     indexPages();
-    // 缩放后需要重画的页已经在上面标成 rendered=false 了，不需要再强制重画一遍
-    renderVisible(false);
+  }
+
+  /** 当前可见（含预渲染边距）的页区间 */
+  function visibleRange(margin) {
+    const st = S();
+    ensureIndex();
+    if (!canUseIndex()) {
+      return { from: 0, to: st.pages.length };
+    }
+    const span = viewSpan(margin === undefined ? 700 : margin);
+    return { from: lowerBoundBottoms(span.y0), to: lowerBoundTops(span.y1) };
+  }
+
+  /** 缩放落位后等手停下来再重画（连续点 +/- 只在最后画一次） */
+  let zoomRenderTimer = 0;
+  function scheduleZoomRender() {
+    clearTimeout(zoomRenderTimer);
+    zoomRenderTimer = setTimeout(() => {
+      zoomRenderTimer = 0;
+      renderVisible(false);
+    }, 120);
   }
 
   /**
@@ -889,6 +949,8 @@
     const st = S();
     const pages = st.pages;
     if (!pages.length) return;
+    // 缩放刚改过尺寸时索引是失效的，这里补建（此时布局已稳定，读 offsetTop 不再触发重排）
+    ensureIndex();
 
     if (!canUseIndex()) {
       // 缩放预览中（.pages 上有 transform）：退回逐页测量，此时页面数量少、调用也不频繁
@@ -933,7 +995,15 @@
     const p = st.pages.find((x) => x.id === pageId);
     if (!p || p.src == null) return;
     if (p.rendering) {
-      // 正在绘制：记一个待办，等这次结束后再补一次，避免并发绘制同一画布
+      // 正在绘制：记一个待办，等这次结束后再补一次，避免并发绘制同一画布。
+      // 如果这期间缩放已经变了，这张图注定过期 —— 直接取消，别让它画完再重画一遍
+      if (p._renderZoom !== st.zoom) {
+        try {
+          if (p._task) p._task.cancel();
+        } catch (e) {
+          /* 已经结束了，忽略 */
+        }
+      }
       p._queued = true;
       return;
     }
@@ -943,6 +1013,7 @@
     p._q = null;
     p._renderStart = Date.now();
     p._lastZoom = st.zoom;
+    p._renderZoom = st.zoom;
     const zoom = st.zoom;
     const dpr = window.devicePixelRatio || 1;
     try {
@@ -969,7 +1040,9 @@
       const octx = off.getContext('2d', { alpha: false });
       octx.fillStyle = '#ffffff';
       octx.fillRect(0, 0, w, h);
-      await page.render({ canvasContext: octx, viewport }).promise;
+      const task = page.render({ canvasContext: octx, viewport });
+      p._task = task;
+      await task.promise;
       // 渲染期间切了标签页、或者这页已经被滚出视野拆掉了画布：本次结果作废
       if (S() !== st || p.canvas !== canvas) return;
       // 同一帧内完成「改尺寸 + 拷贝」，中间不会产生白帧
@@ -977,8 +1050,6 @@
         canvas.width = w;
         canvas.height = h;
       }
-      canvas.style.width = p.wPt * zoom + 'px';
-      canvas.style.height = p.hPt * zoom + 'px';
       const ctx = canvas.getContext('2d', { alpha: false });
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.drawImage(off, 0, 0);
@@ -995,6 +1066,7 @@
       if (p.canvas) p.canvas.style.visibility = '';
     } finally {
       p.rendering = false;
+      p._task = null;
       p._renderStart = 0;
       if (p._queued) {
         p._queued = false;
@@ -1210,7 +1282,9 @@
   /** 停手后把可见页从「低清」补成「高清」（顺带补文本层） */
   function upgradeVisible() {
     const st = S();
-    if (!st.pages.length || !canUseIndex()) return;
+    if (!st.pages.length) return;
+    ensureIndex();
+    if (!canUseIndex()) return;
     const { y0, y1 } = viewSpan(700);
     const from = lowerBoundBottoms(y0);
     const to = lowerBoundTops(y1);
@@ -1230,6 +1304,7 @@
   function updatePageIndicator() {
     const state = S();
     if (!state.pages.length) return;
+    ensureIndex();
     let best;
     if (canUseIndex()) {
       // 取「页首最接近视口顶部 +8px」的那一页：先二分定位，再和下一页比一次距离，
@@ -1301,11 +1376,35 @@
     return { index: S().currentPage, ratio: (area.top - r.top + ANCHOR_PAD) / Math.max(1, r.height) };
   }
 
+  /**
+   * 单页视图里第 index 页的纵向起点（相对滚动内容顶部）。
+   *
+   * 用高度累加算，不去读 offsetTop：layout 刚改完几百个尺寸，此时读任何几何值
+   * 都会强制浏览器立刻把整篇重排一遍（553 页实测多花 60ms），
+   * 而缩放落位只需要知道「这一页在哪」，累加就够了。
+   */
+  function pageTopOffset(index) {
+    const st = S();
+    const z = st.zoom;
+    let y = PAD_TOP;
+    for (let i = 0; i < index; i += 1) {
+      const p = st.pages[i];
+      if (!p) continue;
+      y += p.hPt * z + PAGE_GAP;
+    }
+    return y;
+  }
+
   function restoreAnchor(anchor) {
     if (!anchor) return;
-    const p = S().pages[anchor.index];
+    const st = S();
+    const p = st.pages[anchor.index];
     if (!p || !p.el) return;
-    el.scroll.scrollTop = p.el.offsetTop - ANCHOR_PAD + anchor.ratio * p.el.offsetHeight;
+    // 双页是行内换行，只能读真实位置；单页用累加公式，
+    // 免得在 layout 刚写完尺寸时读 offsetTop（那会强制整篇同步重排）
+    const top = st.twoUp ? p.el.offsetTop : pageTopOffset(anchor.index);
+    const h = st.twoUp ? p.el.offsetHeight : p.hPt * st.zoom;
+    el.scroll.scrollTop = Math.max(0, top - ANCHOR_PAD + anchor.ratio * h);
   }
 
   /**
@@ -1372,8 +1471,7 @@
     // 重建该页 DOM 尺寸。旧画布还是旋转前的比例，先藏起来，
     // 否则在异步重绘完成前会被拉成新比例（画面明显变形）
     if (p.canvas) p.canvas.style.visibility = 'hidden';
-    p.el.style.width = p.wPt * state.zoom + 'px';
-    p.el.style.height = p.hPt * state.zoom + 'px';
+    applyPageSize(p);
     sizeOverlay(p);
     state.dirty = true;
     App.history.push();
@@ -1426,8 +1524,6 @@
     ensureCanvas(p);
     p.canvas.width = Math.max(1, Math.round(p.wPt * state.zoom * (window.devicePixelRatio || 1)));
     p.canvas.height = Math.max(1, Math.round(p.hPt * state.zoom * (window.devicePixelRatio || 1)));
-    p.canvas.style.width = p.wPt * state.zoom + 'px';
-    p.canvas.style.height = p.hPt * state.zoom + 'px';
     const c = p.canvas.getContext('2d');
     c.fillStyle = '#fff';
     c.fillRect(0, 0, p.canvas.width, p.canvas.height);

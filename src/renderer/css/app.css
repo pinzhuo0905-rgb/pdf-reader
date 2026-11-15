@@ -664,6 +664,23 @@ body[data-lang='en'] {
   height: 100%;
 }
 
+/* 缩放预览期间（.pages 上有 transform）：只让页面位图参与合成。
+   文本层有几百个绝对定位的 span、标注层每页一张画布、页面还带阴影，
+   每变一次 transform 浏览器都要把它们重新光栅化一遍，缩放动画就会一顿一顿。
+   这些都只是「细节」，缩放过程中看不清也无所谓，松手重画时再一起恢复。 */
+.pages.previewing {
+  will-change: transform;
+}
+
+.pages.previewing .textLayer,
+.pages.previewing canvas.overlay {
+  visibility: hidden;
+}
+
+.pages.previewing .page {
+  box-shadow: none;
+}
+
 .page .textLayer {
   position: absolute;
   inset: 0;
