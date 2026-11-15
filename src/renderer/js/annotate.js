@@ -273,6 +273,7 @@
   /** 文本框高度自动跟随内容：改窄/改字后把框撑到刚好放下文字 */
   function fitTextHeight(page, a) {
     if (!a || (a.type !== 'text' && a.type !== 'textedit') || !a.text) return;
+    if (!page.overlay) return;
     const ctx = page.overlay.getContext('2d');
     const zoom = S().zoom;
     const w = page.wPt * zoom;

@@ -625,23 +625,52 @@
     div.style.width = p.wPt * S().zoom + 'px';
     div.style.height = p.hPt * S().zoom + 'px';
 
-    const canvas = document.createElement('canvas');
-    canvas.className = 'base';
-    const overlay = document.createElement('canvas');
-    overlay.className = 'overlay';
     const textLayer = document.createElement('div');
     textLayer.className = 'textLayer';
-
-    div.appendChild(canvas);
-    div.appendChild(overlay);
     div.appendChild(textLayer);
     el.pages.appendChild(div);
 
     p.el = div;
-    p.canvas = canvas;
-    p.overlay = overlay;
+    p.canvas = null;
+    p.overlay = null;
     p.textLayer = textLayer;
     return div;
+  }
+
+  /**
+   * 按需创建页面画布（只给靠近视口的页建）。
+   *
+   * 以前是建 DOM 时给每页都挂一张 canvas。几百页的文档等于上千张画布，
+   * 仅默认 300×150 的后备存储就要两百多兆，渲染进程的画布预算被吃光之后，
+   * 新建的画布画什么都不生效 —— 表现就是打开大文档后整页全黑（滚动/缩放后
+   * 远处的画布被释放，黑页才会恢复）。改成按需创建 + 滚远销毁。
+   */
+  function ensureCanvas(p) {
+    if (p.canvas) return p.canvas;
+    const canvas = document.createElement('canvas');
+    canvas.className = 'base';
+    const overlay = document.createElement('canvas');
+    overlay.className = 'overlay';
+    const z = S().zoom;
+    canvas.style.width = p.wPt * z + 'px';
+    canvas.style.height = p.hPt * z + 'px';
+    if (p.el) {
+      p.el.insertBefore(canvas, p.textLayer || null);
+      p.el.insertBefore(overlay, p.textLayer || null);
+    }
+    p.canvas = canvas;
+    p.overlay = overlay;
+    sizeOverlay(p);
+    return canvas;
+  }
+
+  /** 滚出视野后彻底拆掉画布，把后备存储还给渲染进程 */
+  function dropCanvas(p) {
+    if (p.canvas && p.canvas.parentNode) p.canvas.parentNode.removeChild(p.canvas);
+    if (p.overlay && p.overlay.parentNode) p.overlay.parentNode.removeChild(p.overlay);
+    p.canvas = null;
+    p.overlay = null;
+    p.rendered = false;
   }
 
   function layout() {
@@ -698,6 +727,7 @@
   }
 
   function sizeOverlay(p) {
+    if (!p.overlay) return;
     const dpr = window.devicePixelRatio || 1;
     const w = Math.max(1, Math.round(p.wPt * S().zoom));
     const h = Math.max(1, Math.round(p.hPt * S().zoom));
@@ -716,16 +746,12 @@
         if (force || !p.rendered) renderPage(p.id);
       }
     }
-    // 页面过多时释放远处画布
+    // 页面过多时释放远处画布（连同元素一起拆掉，否则后备存储一直占着）
     if (S().pages.length > 40) {
       for (const p of S().pages) {
         if (!p.el || !p.rendered) continue;
         const r = p.el.getBoundingClientRect();
-        if (r.bottom < area.top - 2400 || r.top > area.bottom + 2400) {
-          p.canvas.width = 1;
-          p.canvas.height = 1;
-          p.rendered = false;
-        }
+        if (r.bottom < area.top - 2400 || r.top > area.bottom + 2400) dropCanvas(p);
       }
     }
   }
@@ -750,6 +776,7 @@
       if (!page) return;
       // 渲染期间切换了标签页：放弃本次绘制，等激活时重来
       if (S() !== st) return;
+      ensureCanvas(p);
       const viewport = page.getViewport({ scale: zoom * dpr, rotation: p.rot });
       const canvas = p.canvas;
       const w = Math.max(1, Math.round(viewport.width));
@@ -763,7 +790,8 @@
       octx.fillStyle = '#ffffff';
       octx.fillRect(0, 0, w, h);
       await page.render({ canvasContext: octx, viewport }).promise;
-      if (S() !== st) return;
+      // 渲染期间切了标签页、或者这页已经被滚出视野拆掉了画布：本次结果作废
+      if (S() !== st || p.canvas !== canvas) return;
       // 同一帧内完成「改尺寸 + 拷贝」，中间不会产生白帧
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width = w;
@@ -775,14 +803,14 @@
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.drawImage(off, 0, 0);
       p.rendered = true;
-      p.canvas.style.visibility = '';
+      canvas.style.visibility = '';
       await buildTextLayer(p, page, zoom);
       drawOverlay(p);
       renderThumbIfOpen(p);
     } catch (err) {
       if (err && err.name !== 'RenderingCancelledException') console.warn('render fail', err);
       // 渲染失败也要把画布显示出来，否则该页会一直空白
-      p.canvas.style.visibility = '';
+      if (p.canvas) p.canvas.style.visibility = '';
     } finally {
       p.rendering = false;
       p._renderStart = 0;
@@ -855,6 +883,7 @@
 
   /* ------------------------------- 标注层 ------------------------------- */
   function drawOverlay(p) {
+    if (!p.overlay) return;
     const ctx = p.overlay.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
     const W = p.overlay.width;
@@ -1076,7 +1105,7 @@
     cache.textContent.delete(p.id);
     // 重建该页 DOM 尺寸。旧画布还是旋转前的比例，先藏起来，
     // 否则在异步重绘完成前会被拉成新比例（画面明显变形）
-    p.canvas.style.visibility = 'hidden';
+    if (p.canvas) p.canvas.style.visibility = 'hidden';
     p.el.style.width = p.wPt * state.zoom + 'px';
     p.el.style.height = p.hPt * state.zoom + 'px';
     sizeOverlay(p);
@@ -1128,6 +1157,7 @@
     const next = state.pages[index + 2];
     if (next && next.el) el.pages.insertBefore(div, next.el);
     // 空白页直接画白
+    ensureCanvas(p);
     p.canvas.width = Math.max(1, Math.round(p.wPt * state.zoom * (window.devicePixelRatio || 1)));
     p.canvas.height = Math.max(1, Math.round(p.hPt * state.zoom * (window.devicePixelRatio || 1)));
     p.canvas.style.width = p.wPt * state.zoom + 'px';
@@ -1222,9 +1252,37 @@
   }
 
   /* ------------------------------- 缩略图 ------------------------------- */
+  /** 缩略图也按需渲染：几百页的文档一次性建满画布同样会把画布预算吃光 */
+  let thumbObserver = null;
+  let thumbObserverRoot = null;
+
+  function thumbWatcher() {
+    if (typeof IntersectionObserver !== 'function') return null;
+    if (thumbObserver && thumbObserverRoot === el.thumbs) return thumbObserver;
+    if (thumbObserver) thumbObserver.disconnect();
+    thumbObserverRoot = el.thumbs;
+    thumbObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          thumbObserver.unobserve(entry.target);
+          const wrap = entry.target.closest('.thumb');
+          if (!wrap) continue;
+          const p = S().pages.find((x) => x.id === wrap.dataset.id);
+          const c = entry.target.querySelector('canvas');
+          if (p && c) renderThumb(p, c);
+        }
+      },
+      { root: el.thumbs, rootMargin: '600px 0px' }
+    );
+    return thumbObserver;
+  }
+
   function buildThumbs() {
     if (el.sidebar.classList.contains('hidden')) return;
+    if (thumbObserver) thumbObserver.disconnect();
     el.thumbs.innerHTML = '';
+    const watcher = thumbWatcher();
     S().pages.forEach((p, i) => {
       const wrap = document.createElement('div');
       wrap.className = 'thumb';
@@ -1234,6 +1292,8 @@
       const box = document.createElement('div');
       box.className = 'thumb-box';
       const c = document.createElement('canvas');
+      c.width = 1;
+      c.height = 1;
       box.appendChild(c);
       wrap.appendChild(box);
 
@@ -1244,7 +1304,8 @@
 
       el.thumbs.appendChild(wrap);
       wrap.addEventListener('click', () => scrollToPage(i));
-      renderThumb(p, c);
+      if (watcher) watcher.observe(box);
+      else renderThumb(p, c);
     });
     highlightThumb(S().currentPage);
   }
@@ -1262,7 +1323,7 @@
         return;
       }
       // 主画布已画好：直接缩放过来，既快又不会和主渲染抢同一页
-      if (p.rendered && p.canvas.width > 1) {
+      if (p.rendered && p.canvas && p.canvas.width > 1) {
         const w = Math.max(1, Math.round(p.wPt * scale));
         const h = Math.max(1, Math.round(p.hPt * scale));
         canvas.width = w;
