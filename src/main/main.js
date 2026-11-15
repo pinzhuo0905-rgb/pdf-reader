@@ -125,9 +125,12 @@ let devHooked = false;
  */
 function createWindow(opts = {}) {
   const b = opts.bounds || {};
+  // 自检期可用 PDFREADER_SIZE=1090x720 指定窗口尺寸，方便核对窄窗口布局
+  const sizeEnv = process.env.PDFREADER_SIZE || '';
+  const sizeMatch = /^(\d{3,4})x(\d{3,4})$/.exec(sizeEnv);
   const win = new BrowserWindow({
-    width: b.width || 1280,
-    height: b.height || 860,
+    width: b.width || (sizeMatch ? Number(sizeMatch[1]) : 1280),
+    height: b.height || (sizeMatch ? Number(sizeMatch[2]) : 860),
     x: b.x,
     y: b.y,
     minWidth: 640,

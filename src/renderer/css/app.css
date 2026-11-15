@@ -106,7 +106,7 @@ body[data-lang='en'] {
   height: 48px;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
   padding: 0 8px;
   background: var(--tb-bg);
   border-bottom: 1px solid var(--tb-border);
@@ -114,24 +114,75 @@ body[data-lang='en'] {
   -webkit-app-region: no-drag;
 }
 
+/* 三段式 flex 布局：以前中间那段是 absolute 定位居中，
+   窗口一窄左边就会压到它身上（按钮叠在一起）。改成真正的三栏，
+   空间不够时按下面的断点逐级精简，永远不会重叠。 */
 .tb-left,
 .tb-right {
   display: flex;
   align-items: center;
   gap: 1px;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .tb-right {
-  margin-left: auto;
+  justify-content: flex-end;
 }
 
 .tb-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 1px;
+  margin: 0 auto;
+}
+
+/* 窄窗口：先去掉「绘制」的文字标签，再收分隔线和滑块 */
+@media (max-width: 1320px) {
+  .labeled-btn .lbl {
+    display: none;
+  }
+  .labeled-btn {
+    padding: 0 7px;
+  }
+}
+
+@media (max-width: 1220px) {
+  .toolbar .sep {
+    display: none;
+  }
+  .toolbar {
+    gap: 4px;
+  }
+}
+
+@media (max-width: 1120px) {
+  .zoom-range {
+    width: 68px;
+  }
+  .icon-btn {
+    width: 30px;
+  }
+  .icon-btn.sm {
+    width: 26px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .zoom-range {
+    display: none;
+  }
+  .page-box .of {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  #btn-print,
+  #btn-saveas {
+    display: none;
+  }
 }
 
 .sep {

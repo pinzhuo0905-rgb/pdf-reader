@@ -322,6 +322,7 @@
     runZoomHooks();
     state.zoom = clampZoom(z);
     if (mode) state.zoomMode = mode;
+    markZooming();
     const anchor = captureAnchor();
     layout();
     restoreAnchor(anchor);
@@ -341,12 +342,22 @@
   function fitWidth() {
     const to = autoZoomValue('fitWidth');
     if (to == null) return;
+    // 已经就在目标值上（例如刚最大化过、窗口尺寸变了但还没通知滑块）：
+    // 直接落位并同步滑块，别让它看起来「点了没反应」
+    if (Math.abs(to - S().zoom) < 5e-4) {
+      setZoom(to, 'fitWidth');
+      return;
+    }
     // 当前值到目标值平滑过渡：画面过大就慢慢缩小，过小就慢慢放大
     animateZoom(to, centerAnchor(), 'fitWidth', 420, easeFitZoom);
   }
   function fitPage() {
     const to = autoZoomValue('fitPage');
     if (to == null) return;
+    if (Math.abs(to - S().zoom) < 5e-4) {
+      setZoom(to, 'fitPage');
+      return;
+    }
     animateZoom(to, centerAnchor(), 'fitPage', 420, easeFitZoom);
   }
 
@@ -756,7 +767,8 @@
     }
     applySpreadWidth(z);
     indexPages();
-    renderVisible(resized);
+    // 缩放后需要重画的页已经在上面标成 rendered=false 了，不需要再强制重画一遍
+    renderVisible(false);
   }
 
   /**
@@ -927,6 +939,8 @@
     }
     if (p.rendered && p._lastZoom === st.zoom && p._q === 'full') return;
     p.rendering = true;
+    // 画的过程中质量未知：置空，避免 upgradeVisible 看到上一次的 'full' 而跳过补画
+    p._q = null;
     p._renderStart = Date.now();
     p._lastZoom = st.zoom;
     const zoom = st.zoom;
@@ -985,6 +999,13 @@
       if (p._queued) {
         p._queued = false;
         renderPage(pageId);
+      } else if (p._upgrade) {
+        // 低清那次刚画完，现在补高清（这期间又开始滚动的话就放弃，等下次停手）
+        p._upgrade = false;
+        if (!st._scrolling && p._q !== 'full') {
+          p._lastZoom = -1;
+          renderPage(pageId);
+        }
       }
     }
   }
@@ -1185,6 +1206,15 @@
     }, 160);
   }
 
+  /**
+   * 缩放也算「交互中」：连点 +/- 或捏合时，每次都按 1:1 CSS 像素先画，
+   * 停手 160ms 后再补高清。否则每次落位都要重画 2–3 页 4.2MP 的位图 + 文本层，
+   * 点几下就卡成幻灯片。
+   */
+  function markZooming() {
+    markScrolling();
+  }
+
   /** 停手后把可见页从「低清」补成「高清」（顺带补文本层） */
   function upgradeVisible() {
     const st = S();
@@ -1194,7 +1224,12 @@
     const to = lowerBoundTops(y1);
     for (let i = from; i < to; i += 1) {
       const p = st.pages[i];
-      if (!p || !p.rendered || p._q === 'full') continue;
+      if (!p || p._q === 'full') continue;
+      if (p.rendering) {
+        // 低清那张还在画：记个标记，等它画完立刻补高清
+        p._upgrade = true;
+        continue;
+      }
       p._lastZoom = -1;
       renderPage(p.id);
     }
@@ -1305,6 +1340,9 @@
       computeAutoZoom();
       layout();
       restoreAnchor(a);
+      // computeAutoZoom 直接改 state.zoom，不走 setZoom，这里补一次通知，
+      // 否则最大化后画面自适应了、滑块却还停在旧值
+      notifyZoom();
     }
   }
 
