@@ -35,6 +35,7 @@
     el.pageTotal = document.getElementById('page-total');
     el.floatPage = document.getElementById('float-page');
     el.thumbs = document.getElementById('thumbs');
+    el.sbBody = document.querySelector('#sidebar .sb-body');
     el.outline = document.getElementById('outline');
     el.sidebar = document.getElementById('sidebar');
     el.loading = document.getElementById('loading');
@@ -644,6 +645,9 @@
    */
   const MAX_BITMAP_PX = 4.2e6;
 
+  /** 滚动中的临时分辨率（相对 CSS 像素的倍数）：1 表示 1:1，约 2MP，滚完再补高清 */
+  const QUICK_SCALE = 1;
+
   /**
    * 低清快照：页面滚远拆掉画布前，先留一张 260px 宽的缩略位图。
    * 回访或跳转时先把这张快照铺上去，高清位图随后覆盖 —— 视觉上「立刻有内容」。
@@ -921,7 +925,7 @@
       p._queued = true;
       return;
     }
-    if (p.rendered && p._lastZoom === st.zoom) return;
+    if (p.rendered && p._lastZoom === st.zoom && p._q === 'full') return;
     p.rendering = true;
     p._renderStart = Date.now();
     p._lastZoom = st.zoom;
@@ -935,8 +939,11 @@
       ensureCanvas(p);
       // 位图预算：超过上限就降采样（画布仍按 CSS 尺寸铺满，肉眼几乎无差）
       const want = zoom * dpr;
-      const bitmapScale = p.wPt * p.hPt * want * want > MAX_BITMAP_PX ? Math.sqrt(MAX_BITMAP_PX / (p.wPt * p.hPt)) : want;
-      const viewport = page.getViewport({ scale: bitmapScale, rotation: p.rot });
+      const fullScale = p.wPt * p.hPt * want * want > MAX_BITMAP_PX ? Math.sqrt(MAX_BITMAP_PX / (p.wPt * p.hPt)) : want;
+      // 滚动中按 1:1 CSS 像素画（快得多），停手后再补到 fullScale
+      const scale = st._scrolling ? Math.min(fullScale, zoom * QUICK_SCALE) : fullScale;
+      const isFull = scale >= fullScale - 0.001;
+      const viewport = page.getViewport({ scale, rotation: p.rot });
       const canvas = p.canvas;
       const w = Math.max(1, Math.round(viewport.width));
       const h = Math.max(1, Math.round(viewport.height));
@@ -962,8 +969,10 @@
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.drawImage(off, 0, 0);
       p.rendered = true;
+      p._q = isFull ? 'full' : 'quick';
       canvas.style.visibility = '';
-      await buildTextLayer(p, page, zoom);
+      // 低清阶段不建文本层：500 个 span 的 DOM 在滚动时纯属浪费，停手补高清时再建
+      if (isFull) await buildTextLayer(p, page, zoom);
       drawOverlay(p);
       renderThumbIfOpen(p);
     } catch (err) {
@@ -1150,12 +1159,46 @@
         }
       }
       updatePageIndicator();
+      markScrolling();
       renderVisible(false);
       // 页码浮标只在真的换页时重启动画，避免每帧 clearTimeout/setTimeout
       if (S().currentPage !== before) showFloatPage();
     });
   }
   let scrollRaf = 0;
+
+  /**
+   * 滚动期间用低分辨率快画，停手 160ms 后再补高清。
+   *
+   * 一页 4.2MP 的光栅化要占住主线程上百毫秒，连续滚动时每页都卡一下；
+   * 滚动中按 1:1 CSS 像素画（约 2MP）足够看清「翻到哪了」，停下来再补细节。
+   */
+  function markScrolling() {
+    const st = S();
+    st._scrolling = true;
+    clearTimeout(st._idleT);
+    st._idleT = setTimeout(() => {
+      // 期间切了标签页：这次补画属于旧标签页，丢掉
+      if (S() !== st) return;
+      st._scrolling = false;
+      upgradeVisible();
+    }, 160);
+  }
+
+  /** 停手后把可见页从「低清」补成「高清」（顺带补文本层） */
+  function upgradeVisible() {
+    const st = S();
+    if (!st.pages.length || !canUseIndex()) return;
+    const { y0, y1 } = viewSpan(700);
+    const from = lowerBoundBottoms(y0);
+    const to = lowerBoundTops(y1);
+    for (let i = from; i < to; i += 1) {
+      const p = st.pages[i];
+      if (!p || !p.rendered || p._q === 'full') continue;
+      p._lastZoom = -1;
+      renderPage(p.id);
+    }
+  }
 
   function updatePageIndicator() {
     const state = S();
@@ -1356,6 +1399,7 @@
     p.textLayer.innerHTML = '';
     p.rendered = true;
     p._lastZoom = state.zoom;
+    p._q = 'full';
     sizeOverlay(p);
     state.dirty = true;
     App.history.push();
@@ -1446,9 +1490,13 @@
 
   function thumbWatcher() {
     if (typeof IntersectionObserver !== 'function') return null;
-    if (thumbObserver && thumbObserverRoot === el.thumbs) return thumbObserver;
+    // root 必须是真正在滚的那个元素（.sb-body）。用 #thumbs 当 root 是错的：
+    // 它是 flex 内容、高度等于全部缩略图之和（几百页时十几万像素），
+    // 于是每一张缩略图都算「可见」，一开侧栏就全画一遍，卡好几秒。
+    const root = el.sbBody || null;
+    if (thumbObserver && thumbObserverRoot === root) return thumbObserver;
     if (thumbObserver) thumbObserver.disconnect();
-    thumbObserverRoot = el.thumbs;
+    thumbObserverRoot = root;
     thumbObserver = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -1461,13 +1509,13 @@
           if (p && c) renderThumb(p, c);
         }
       },
-      { root: el.thumbs, rootMargin: '600px 0px' }
+      { root, rootMargin: '600px 0px' }
     );
     return thumbObserver;
   }
 
   function buildThumbs() {
-    if (el.sidebar.classList.contains('hidden')) return;
+    if (!isSidebarOpen()) return;
     if (thumbObserver) thumbObserver.disconnect();
     el.thumbs.innerHTML = '';
     const watcher = thumbWatcher();
@@ -1539,7 +1587,7 @@
   }
 
   function renderThumbIfOpen(p) {
-    if (el.sidebar.classList.contains('hidden')) return;
+    if (!isSidebarOpen()) return;
     const wrap = el.thumbs.querySelector(`.thumb[data-id="${p.id}"]`);
     if (wrap) renderThumb(p, wrap.querySelector('canvas'));
   }
@@ -1566,24 +1614,39 @@
       const box = el.thumbs;
       if (!box || !cur.isConnected) return;
       if (box.scrollHeight <= box.clientHeight) return;
-      const top = cur.offsetTop - box.clientHeight / 2 + cur.offsetHeight / 2;
-      box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+      const top = Math.max(0, cur.offsetTop - box.clientHeight / 2 + cur.offsetHeight / 2);
+      // 跳得远（跨了好几屏）就直接定位：平滑滚动会一路扫过中间几百张缩略图，
+      // 每扫过一张都要触发一次缩略图渲染，反而卡好几秒
+      const far = Math.abs(top - box.scrollTop) > box.clientHeight * 2;
+      box.scrollTo({ top, behavior: far ? 'auto' : 'smooth' });
     }, 120);
   }
 
   function toggleSidebar(show) {
-    const visible = show === undefined ? el.sidebar.classList.contains('hidden') : show;
+    // 收回动画期间再点一次，应该重新打开，而不是继续关
+    const open = !el.sidebar.classList.contains('hidden') && !el.sidebar.classList.contains('closing');
+    const visible = show === undefined ? !open : show;
     // 浮层不改变文档区域宽度：只切换显示，不动缩放，PDF 不会被推挤或重新排版
-    el.sidebar.classList.toggle('hidden', !visible);
+    clearTimeout(toggleSidebar._t);
     if (visible) {
+      el.sidebar.classList.remove('closing');
+      el.sidebar.classList.remove('hidden');
       buildThumbs();
       buildOutline();
+    } else if (!el.sidebar.classList.contains('hidden')) {
+      // 先播收回动画，动画结束再真正隐藏（否则 display:none 会直接掐掉动画）
+      el.sidebar.classList.add('closing');
+      toggleSidebar._t = setTimeout(() => {
+        el.sidebar.classList.add('hidden');
+        el.sidebar.classList.remove('closing');
+      }, 220);
     }
     return visible;
   }
 
   function isSidebarOpen() {
-    return el.sidebar && !el.sidebar.classList.contains('hidden');
+    // 正在收回动画里也算「已关闭」，避免这 220ms 内还去渲染缩略图
+    return el.sidebar && !el.sidebar.classList.contains('hidden') && !el.sidebar.classList.contains('closing');
   }
 
   /* -------------------------------- 搜索 -------------------------------- */

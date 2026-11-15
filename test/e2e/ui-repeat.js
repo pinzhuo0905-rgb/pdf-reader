@@ -51,6 +51,8 @@
     baseArea,
     $('views').querySelector('.view.active .scroll-area').clientWidth,
   ]);
+  // 侧栏收起现在带 220ms 动画，动画结束才真正 display:none
+  await sleep(260);
   assert('repeatSidebarClosed', sb.classList.contains('hidden'));
 
   /* ---------- 2) 目录打开时叠加菜单：层级必须高于浮层 ---------- */

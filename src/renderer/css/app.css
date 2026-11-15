@@ -723,6 +723,24 @@ body[data-lang='en'] {
   }
 }
 
+/* 收回：贴着左缘滑出去，先慢后快（和展开的曲线对称） */
+@keyframes slide-out-left {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.75, 0.6);
+  }
+  100% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+.sidebar.closing {
+  animation: slide-out-left 0.22s both;
+  pointer-events: none;
+}
+
 .sidebar-head {
   height: 40px;
   flex: 0 0 auto;
@@ -1025,6 +1043,30 @@ body[data-lang='en'] {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+@keyframes menu-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.75, 0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-9px) scale(0.975);
+  }
+}
+
+/* 收回：与展开对称的短动画，播完由 JS 再挂 .hidden */
+.menu.menu-out,
+.ctx-menu.menu-out {
+  animation: menu-out 0.16s both;
+  pointer-events: none;
+}
+
+/* 收回动画期间整层不挡点击 */
+.menu-layer.closing {
+  pointer-events: none;
 }
 
 .menu-item {

@@ -118,7 +118,7 @@
     });
     document.addEventListener('pointerdown', (e) => {
       const ctx = $('ctxMenu');
-      if (!ctx.classList.contains('hidden') && !ctx.contains(e.target)) ctx.classList.add('hidden');
+      if (!ctx.classList.contains('hidden') && !ctx.contains(e.target)) hideCtxMenu();
     });
 
     // 键盘
@@ -412,13 +412,38 @@
   }
 
   /* ============================== 菜单 ============================== */
-  function closeMenus() {
-    $('menuLayer').classList.add('hidden');
-    $('menuLayer').innerHTML = '';
+  let menuCloseTimer = 0;
+
+  /**
+   * 关菜单。
+   * 默认先播收回动画（0.16s）再真正隐藏——直接挂 .hidden 是 display:none，
+   * 会把动画直接掐掉，看起来就是「展开有动画、收回没有」。
+   * immediate=true 用于打开新菜单/窗口失焦等必须立刻换内容的场景。
+   */
+  function closeMenus(immediate) {
+    const layer = $('menuLayer');
+    const menu = layer.querySelector('.menu');
+    clearTimeout(menuCloseTimer);
+    if (immediate || !menu || layer.classList.contains('hidden')) {
+      layer.classList.add('hidden');
+      layer.classList.remove('closing');
+      layer.innerHTML = '';
+      return;
+    }
+    // 收回期间整层不接收点击，否则这 160ms 里点哪都被这层吃掉
+    layer.classList.add('closing');
+    menu.classList.add('menu-out');
+    menuCloseTimer = setTimeout(() => {
+      layer.classList.add('hidden');
+      layer.classList.remove('closing');
+      layer.innerHTML = '';
+    }, 160);
   }
 
   function showMenu(anchor, html, opts = {}) {
     const layer = $('menuLayer');
+    clearTimeout(menuCloseTimer);
+    layer.classList.remove('closing');
     layer.classList.remove('hidden');
     layer.innerHTML = '';
     const menu = document.createElement('div');
@@ -650,11 +675,11 @@
     });
     const items = menu.querySelectorAll('.menu-item:not([data-t]):not([data-l])');
     items[0].onclick = () => {
-      closeMenus();
+      closeMenus(true);
       showShortcuts();
     };
     items[1].onclick = () => {
-      closeMenus();
+      closeMenus(true);
       showAbout();
     };
   }
@@ -1001,8 +1026,28 @@
   }
 
   /* ============================== 右键菜单 ============================== */
+  let ctxCloseTimer = 0;
+
+  /** 右键菜单同样先播收回动画再隐藏 */
+  function hideCtxMenu(immediate) {
+    const menu = $('ctxMenu');
+    clearTimeout(ctxCloseTimer);
+    if (immediate || menu.classList.contains('hidden')) {
+      menu.classList.add('hidden');
+      menu.classList.remove('menu-out');
+      return;
+    }
+    menu.classList.add('menu-out');
+    ctxCloseTimer = setTimeout(() => {
+      menu.classList.add('hidden');
+      menu.classList.remove('menu-out');
+    }, 150);
+  }
+
   function showCtxMenu(x, y, items) {
     const menu = $('ctxMenu');
+    clearTimeout(ctxCloseTimer);
+    menu.classList.remove('menu-out');
     menu.innerHTML = items
       .map((it) => `<div class="menu-item">${it.icon ? Icons.svg(it.icon) : ''}<span>${it.label}</span></div>`)
       .join('');
@@ -1013,7 +1058,7 @@
     menu.style.top = Math.min(y, window.innerHeight - h - 8) + 'px';
     menu.querySelectorAll('.menu-item').forEach((el, i) => {
       el.onclick = () => {
-        menu.classList.add('hidden');
+        hideCtxMenu();
         items[i].onClick();
       };
     });
