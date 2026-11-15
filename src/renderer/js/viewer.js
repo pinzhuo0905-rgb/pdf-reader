@@ -638,6 +638,49 @@
   }
 
   /**
+   * 单页位图预算（像素）。zoom 2.55 × dpr 2 时一页是 2428×3303 ≈ 8MP，
+   * 光栅化慢、占内存也多；超过预算就按比例降采样，画布仍按 CSS 尺寸铺满，
+   * 肉眼看不出差别（等效 dpr 仍有 1.4 以上）。
+   */
+  const MAX_BITMAP_PX = 4.2e6;
+
+  /**
+   * 低清快照：页面滚远拆掉画布前，先留一张 260px 宽的缩略位图。
+   * 回访或跳转时先把这张快照铺上去，高清位图随后覆盖 —— 视觉上「立刻有内容」。
+   */
+  const SNAP_WIDTH = 260;
+  const SNAP_BUDGET = 24 * 1024 * 1024;
+  const snaps = new Map();
+  let snapBytes = 0;
+
+  function snapshotPage(p) {
+    const c = p.canvas;
+    if (!c || !c.width) return;
+    const w = SNAP_WIDTH;
+    const h = Math.max(1, Math.round((c.height / c.width) * w));
+    let snap = snaps.get(p.id);
+    if (snap) {
+      snapBytes -= snap.bytes;
+      snaps.delete(p.id);
+    }
+    snap = { canvas: document.createElement('canvas'), bytes: 0 };
+    snap.canvas.width = w;
+    snap.canvas.height = h;
+    snap.bytes = w * h * 4;
+    const ctx = snap.canvas.getContext('2d', { alpha: false });
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(c, 0, 0, w, h);
+    snaps.set(p.id, snap);
+    snapBytes += snap.bytes;
+    while (snapBytes > SNAP_BUDGET && snaps.size > 1) {
+      const oldest = snaps.keys().next().value;
+      snapBytes -= snaps.get(oldest).bytes;
+      snaps.delete(oldest);
+    }
+  }
+
+  /**
    * 按需创建页面画布（只给靠近视口的页建）。
    *
    * 以前是建 DOM 时给每页都挂一张 canvas。几百页的文档等于上千张画布，
@@ -661,11 +704,19 @@
     p.canvas = canvas;
     p.overlay = overlay;
     sizeOverlay(p);
+    // 有快照先铺上：跳转/回访时页面立刻有内容，高清位图稍后覆盖
+    const snap = snaps.get(p.id);
+    if (snap) {
+      canvas.width = snap.canvas.width;
+      canvas.height = snap.canvas.height;
+      canvas.getContext('2d', { alpha: false }).drawImage(snap.canvas, 0, 0);
+    }
     return canvas;
   }
 
-  /** 滚出视野后彻底拆掉画布，把后备存储还给渲染进程 */
+  /** 滚出视野后彻底拆掉画布，把后备存储还给渲染进程（位图先存成低清快照） */
   function dropCanvas(p) {
+    if (p.rendered) snapshotPage(p);
     if (p.canvas && p.canvas.parentNode) p.canvas.parentNode.removeChild(p.canvas);
     if (p.overlay && p.overlay.parentNode) p.overlay.parentNode.removeChild(p.overlay);
     p.canvas = null;
@@ -700,7 +751,89 @@
       }
     }
     applySpreadWidth(z);
+    indexPages();
     renderVisible(resized);
+  }
+
+  /**
+   * 缓存每页的纵向起点与终点（相对 .pages）。
+   *
+   * 滚动时如果逐页 getBoundingClientRect，553 页的文档每帧要做上千次布局查询，
+   * 一帧光记账就 10ms 起步，滚动自然不跟手。这里在排版后记一次，滚动时用二分查找。
+   */
+  function indexPages() {
+    const st = S();
+    const n = st.pages.length;
+    const tops = new Float64Array(n);
+    const bottoms = new Float64Array(n);
+    for (let i = 0; i < n; i += 1) {
+      const p = st.pages[i];
+      if (!p.el) continue;
+      const top = p.el.offsetTop;
+      tops[i] = top;
+      bottoms[i] = top + p.el.offsetHeight;
+    }
+    st._tops = tops;
+    st._bottoms = bottoms;
+    st._indexed = true;
+  }
+
+  /** 内容坐标 → 页序号（二分；找不到返回 0） */
+  function pageIndexAt(y) {
+    const tops = S()._tops;
+    if (!tops || !tops.length) return 0;
+    let lo = 0;
+    let hi = tops.length - 1;
+    let ans = 0;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (tops[mid] <= y) {
+        ans = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return ans;
+  }
+
+  /** 第一个 bottoms[i] > y 的下标 */
+  function lowerBoundBottoms(y) {
+    const bottoms = S()._bottoms;
+    if (!bottoms) return 0;
+    let lo = 0;
+    let hi = bottoms.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (bottoms[mid] > y) hi = mid;
+      else lo = mid + 1;
+    }
+    return lo;
+  }
+
+  /** 第一个 tops[i] >= y 的下标 */
+  function lowerBoundTops(y) {
+    const tops = S()._tops;
+    if (!tops) return 0;
+    let lo = 0;
+    let hi = tops.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (tops[mid] >= y) hi = mid;
+      else lo = mid + 1;
+    }
+    return lo;
+  }
+
+  /** 缩放预览期间 .pages 上有 transform，缓存坐标不可信，退回逐页测量 */
+  function canUseIndex() {
+    return S()._indexed && el.pages && !el.pages.style.transform;
+  }
+
+  /** 可见区在「内容坐标」里的上下边界（与 offsetTop / scrollTop 同一坐标系） */
+  function viewSpan(margin) {
+    const top = el.scroll.scrollTop;
+    return { y0: top - margin, y1: top + el.scroll.clientHeight + margin };
   }
 
   /**
@@ -737,21 +870,44 @@
 
   /* ------------------------------ 懒渲染 ------------------------------ */
   function renderVisible(force) {
-    const area = el.scroll.getBoundingClientRect();
-    const margin = 700;
-    for (const p of S().pages) {
-      if (!p.el) continue;
-      const r = p.el.getBoundingClientRect();
-      if (r.bottom > area.top - margin && r.top < area.bottom + margin) {
-        if (force || !p.rendered) renderPage(p.id);
-      }
-    }
-    // 页面过多时释放远处画布（连同元素一起拆掉，否则后备存储一直占着）
-    if (S().pages.length > 40) {
-      for (const p of S().pages) {
-        if (!p.el || !p.rendered) continue;
+    const st = S();
+    const pages = st.pages;
+    if (!pages.length) return;
+
+    if (!canUseIndex()) {
+      // 缩放预览中（.pages 上有 transform）：退回逐页测量，此时页面数量少、调用也不频繁
+      const area = el.scroll.getBoundingClientRect();
+      const margin = 700;
+      for (const p of pages) {
+        if (!p.el) continue;
         const r = p.el.getBoundingClientRect();
-        if (r.bottom < area.top - 2400 || r.top > area.bottom + 2400) dropCanvas(p);
+        if (r.bottom > area.top - margin && r.top < area.bottom + margin) {
+          if (force || !p.rendered) renderPage(p.id);
+        }
+      }
+      return;
+    }
+
+    const { y0, y1 } = viewSpan(700);
+    const from = lowerBoundBottoms(y0);
+    const to = lowerBoundTops(y1);
+    for (let i = from; i < to; i += 1) {
+      const p = pages[i];
+      if (!p || !p.el) continue;
+      if (force || !p.rendered) renderPage(p.id);
+    }
+
+    // 离视口超过 2400px 的页把画布拆掉（连同元素），后备存储立刻还给渲染进程
+    if (pages.length > 40) {
+      const far0 = lowerBoundBottoms(y0 - 1700); // 700 + 1700 = 2400
+      for (let i = 0; i < far0; i += 1) {
+        const p = pages[i];
+        if (p && p.rendered) dropCanvas(p);
+      }
+      const far1 = lowerBoundTops(y1 + 1700);
+      for (let i = far1; i < pages.length; i += 1) {
+        const p = pages[i];
+        if (p && p.rendered) dropCanvas(p);
       }
     }
   }
@@ -777,7 +933,10 @@
       // 渲染期间切换了标签页：放弃本次绘制，等激活时重来
       if (S() !== st) return;
       ensureCanvas(p);
-      const viewport = page.getViewport({ scale: zoom * dpr, rotation: p.rot });
+      // 位图预算：超过上限就降采样（画布仍按 CSS 尺寸铺满，肉眼几乎无差）
+      const want = zoom * dpr;
+      const bitmapScale = p.wPt * p.hPt * want * want > MAX_BITMAP_PX ? Math.sqrt(MAX_BITMAP_PX / (p.wPt * p.hPt)) : want;
+      const viewport = page.getViewport({ scale: bitmapScale, rotation: p.rot });
       const canvas = p.canvas;
       const w = Math.max(1, Math.round(viewport.width));
       const h = Math.max(1, Math.round(viewport.height));
@@ -864,13 +1023,17 @@
       });
     }
     layer.appendChild(frag);
-    // 横向拉伸对齐原始排版
-    for (const s of spans) {
-      const target = parseFloat(s.dataset.target);
-      const natural = s.getBoundingClientRect().width;
+    // 横向拉伸对齐原始排版。
+    // 必须「先把所有宽度读完，再统一写 transform」：读一次写一次交替会让每个 span
+    // 都触发一次强制回流，这本书每页 450+ 个 span，实测要 273ms；两趟做完降到几十毫秒。
+    const naturals = new Array(spans.length);
+    for (let i = 0; i < spans.length; i += 1) naturals[i] = spans[i].getBoundingClientRect().width;
+    for (let i = 0; i < spans.length; i += 1) {
+      const target = parseFloat(spans[i].dataset.target);
+      const natural = naturals[i];
       if (natural > 0.5 && target > 0.5) {
         const sx = target / natural;
-        if (Math.abs(sx - 1) > 0.02) s.style.transform = `scaleX(${sx.toFixed(3)})`;
+        if (Math.abs(sx - 1) > 0.02) spans[i].style.transform = `scaleX(${sx.toFixed(3)})`;
       }
     }
     p.textItems = items;
@@ -978,6 +1141,7 @@
     if (scrollRaf) return;
     scrollRaf = requestAnimationFrame(() => {
       scrollRaf = 0;
+      const before = S().currentPage;
       for (const fn of scrollHooks) {
         try {
           fn();
@@ -987,7 +1151,8 @@
       }
       updatePageIndicator();
       renderVisible(false);
-      showFloatPage();
+      // 页码浮标只在真的换页时重启动画，避免每帧 clearTimeout/setTimeout
+      if (S().currentPage !== before) showFloatPage();
     });
   }
   let scrollRaf = 0;
@@ -995,21 +1160,37 @@
   function updatePageIndicator() {
     const state = S();
     if (!state.pages.length) return;
-    const area = el.scroll.getBoundingClientRect();
-    let best = 0;
-    let bestDist = Infinity;
-    state.pages.forEach((p, i) => {
-      if (!p.el) return;
-      const r = p.el.getBoundingClientRect();
-      const d = Math.abs(r.top - area.top - 8);
-      if (r.bottom > area.top + 20 && d < bestDist) {
-        bestDist = d;
-        best = i;
+    let best;
+    if (canUseIndex()) {
+      // 取「页首最接近视口顶部 +8px」的那一页：先二分定位，再和下一页比一次距离，
+      // 否则滚到 offsetTop-14 时（scrollToPage 的落点）会误判成上一页
+      const y = el.scroll.scrollTop + 8;
+      best = pageIndexAt(y);
+      const nxt = best + 1;
+      if (nxt < state.pages.length) {
+        const d1 = Math.abs((state._tops[best] || 0) - y);
+        const d2 = Math.abs((state._tops[nxt] || 0) - y);
+        if (d2 < d1) best = nxt;
       }
-    });
+    } else {
+      const area = el.scroll.getBoundingClientRect();
+      best = 0;
+      let bestDist = Infinity;
+      state.pages.forEach((p, i) => {
+        if (!p.el) return;
+        const r = p.el.getBoundingClientRect();
+        const d = Math.abs(r.top - area.top - 8);
+        if (r.bottom > area.top + 20 && d < bestDist) {
+          bestDist = d;
+          best = i;
+        }
+      });
+    }
+    const total = '/ ' + state.pages.length;
+    if (best === state.currentPage && el.pageInput.value === String(best + 1) && el.pageTotal.textContent === total) return;
     state.currentPage = best;
     el.pageInput.value = best + 1;
-    el.pageTotal.textContent = '/ ' + state.pages.length;
+    el.pageTotal.textContent = total;
     highlightThumb(best);
   }
 
@@ -1023,11 +1204,18 @@
   function scrollToPage(index, smooth = true) {
     const p = S().pages[index];
     if (!p || !p.el) return;
+    // 长距离跳转（比如从目录的 List 1 跳到 List 20，中间两百页）不做平滑动画：
+    // 动画会扫过沿途所有页，每页都要走一遍「渲染 + 文本层」，滚动本身也被逐帧记账拖慢，
+    // 最后反而比直接跳更慢。只有同屏附近的跳转才保留平滑感。
+    const far = Math.abs(index - S().currentPage) > 8;
+    const animate = smooth && !far;
     const top = Math.max(0, p.el.offsetTop - 14);
-    el.scroll.scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' });
+    el.scroll.scrollTo({ top, behavior: animate ? 'smooth' : 'auto' });
     S().currentPage = index;
     el.pageInput.value = index + 1;
     highlightThumb(index);
+    // 瞬时跳转不会有滚动事件接力，立刻把目标页排进渲染队列
+    if (!animate) renderVisible(false);
   }
 
   function captureAnchor() {
@@ -1361,16 +1549,26 @@
   }
 
   function highlightThumb(index) {
-    let active = null;
-    el.thumbs.querySelectorAll('.thumb').forEach((t) => {
-      const on = Number(t.dataset.index) === index;
-      t.classList.toggle('current', on);
-      if (on) active = t;
-    });
-    if (active && el.thumbs.scrollHeight > el.thumbs.clientHeight) {
-      const top = active.offsetTop - el.thumbs.clientHeight / 2 + active.offsetHeight / 2;
-      el.thumbs.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-    }
+    const list = el.thumbs ? el.thumbs.children : null;
+    if (!list || !list.length) return;
+    const prev = S()._thumbIndex;
+    const cur = list[index];
+    if (prev === index && cur && cur.classList.contains('current')) return;
+    // 只改前后两个节点：以前每帧对 553 个缩略图逐个 classList.toggle
+    if (prev !== undefined && prev !== index && list[prev]) list[prev].classList.remove('current');
+    if (!cur) return;
+    cur.classList.add('current');
+    S()._thumbIndex = index;
+    // 缩略图列表跟随：连续滚动时不必每帧都去改它的滚动位置，
+    // 停下来（或跳转）之后再定位一次即可，省掉每帧的 smooth scroll 与强制布局
+    clearTimeout(highlightThumb._t);
+    highlightThumb._t = setTimeout(() => {
+      const box = el.thumbs;
+      if (!box || !cur.isConnected) return;
+      if (box.scrollHeight <= box.clientHeight) return;
+      const top = cur.offsetTop - box.clientHeight / 2 + cur.offsetHeight / 2;
+      box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    }, 120);
   }
 
   function toggleSidebar(show) {
