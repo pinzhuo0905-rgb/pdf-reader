@@ -354,6 +354,7 @@
     const swatches = (colors, key) => {
       colors.forEach((c) => {
         const b = document.createElement('button');
+        b.type = 'button';
         b.className = 'sw' + (state.opts[key] === c ? ' on' : '');
         b.style.background = c;
         b.title = c;
@@ -482,7 +483,7 @@
 
   function colorMenuHTML(title, colors, current) {
     return `<div class="menu-title">${title}</div><div class="color-grid">${colors
-      .map((c) => `<button data-c="${c}" class="${c === current ? 'on' : ''}" style="background:${c}"></button>`)
+      .map((c) => `<button type="button" data-c="${c}" class="${c === current ? 'on' : ''}" style="background:${c}"></button>`)
       .join('')}</div>`;
   }
 
@@ -939,6 +940,7 @@
     foot.innerHTML = '';
     for (const b of footButtons) {
       const btn = document.createElement('button');
+      btn.type = 'button';
       btn.className = b.primary ? 'btn-primary' : 'btn-ghost';
       btn.textContent = b.label;
       btn.onclick = () => {

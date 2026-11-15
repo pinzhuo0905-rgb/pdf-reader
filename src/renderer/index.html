@@ -14,7 +14,7 @@
       <!-- ============================= 标签条 ============================= -->
       <div id="tabbar" class="tabbar">
         <div id="tabstrip" class="tabstrip"></div>
-        <button id="tab-new" class="tab-new" data-i18n-title="tab.new">
+        <button type="button" id="tab-new" class="tab-new" data-i18n-title="tab.new">
           <svg class="ic" width="16" height="16" viewBox="0 0 20 20" aria-hidden="true">
             <path d="M10 4.2v11.6M4.2 10h11.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
           </svg>
@@ -22,50 +22,50 @@
         <div id="tabDrop" class="tab-drop hidden"></div>
         <!-- 自绘窗口按钮：与标签同一行 -->
         <div class="win-controls" id="win-controls">
-          <button class="win-btn" id="win-min" data-icon="winMin" data-i18n-title="win.min"></button>
-          <button class="win-btn" id="win-max" data-icon="winMax" data-i18n-title="win.max"></button>
-          <button class="win-btn close" id="win-close" data-icon="winClose" data-i18n-title="modal.close"></button>
+          <button type="button" class="win-btn" id="win-min" data-icon="winMin" data-i18n-title="win.min"></button>
+          <button type="button" class="win-btn" id="win-max" data-icon="winMax" data-i18n-title="win.max"></button>
+          <button type="button" class="win-btn close" id="win-close" data-icon="winClose" data-i18n-title="modal.close"></button>
         </div>
       </div>
 
       <!-- ============================== 工具栏 ============================== -->
       <header id="toolbar" class="toolbar">
         <div class="tb-left">
-          <button class="icon-btn" id="btn-menu" data-icon="menu" data-i18n-title="tb.menu"></button>
+          <button type="button" class="icon-btn" id="btn-menu" data-icon="menu" data-i18n-title="tb.menu"></button>
           <span class="sep"></span>
-          <button class="icon-btn" id="btn-undo" data-icon="undo" data-i18n-title="tb.undo" disabled></button>
-          <button class="icon-btn" id="btn-redo" data-icon="redo" data-i18n-title="tb.redo" disabled></button>
+          <button type="button" class="icon-btn" id="btn-undo" data-icon="undo" data-i18n-title="tb.undo" disabled></button>
+          <button type="button" class="icon-btn" id="btn-redo" data-icon="redo" data-i18n-title="tb.redo" disabled></button>
 
           <div class="tb-group" id="grp-highlight">
-            <button class="icon-btn" id="btn-highlight" data-i18n-title="tb.highlight">
+            <button type="button" class="icon-btn" id="btn-highlight" data-i18n-title="tb.highlight">
               <span class="ico" data-icon="highlight"></span>
               <i class="swatch" id="hl-swatch"></i>
             </button>
-            <button class="caret" id="btn-hl-caret" data-i18n-title="tb.highlightOpt" data-icon="chevronDown"></button>
+            <button type="button" class="caret" id="btn-hl-caret" data-i18n-title="tb.highlightOpt" data-icon="chevronDown"></button>
           </div>
 
           <div class="tb-group labeled" id="grp-draw">
-            <button class="labeled-btn" id="btn-draw" data-i18n-title="tb.draw">
+            <button type="button" class="labeled-btn" id="btn-draw" data-i18n-title="tb.draw">
               <span class="ico" data-icon="draw"></span><span class="lbl" data-i18n="tb.draw">绘制</span>
             </button>
-            <button class="caret" id="btn-draw-caret" data-i18n-title="tb.drawOpt" data-icon="chevronDown"></button>
+            <button type="button" class="caret" id="btn-draw-caret" data-i18n-title="tb.drawOpt" data-icon="chevronDown"></button>
           </div>
 
           <div class="tb-group" id="grp-eraser">
-            <button class="icon-btn" id="btn-eraser" data-icon="eraser" data-i18n-title="tb.eraser"></button>
-            <button class="caret" id="btn-eraser-caret" data-i18n-title="tb.eraserSize" data-icon="chevronDown"></button>
+            <button type="button" class="icon-btn" id="btn-eraser" data-icon="eraser" data-i18n-title="tb.eraser"></button>
+            <button type="button" class="caret" id="btn-eraser-caret" data-i18n-title="tb.eraserSize" data-icon="chevronDown"></button>
           </div>
 
           <span class="sep"></span>
-          <button class="icon-btn" id="btn-textbox" data-icon="textBox" data-i18n-title="tb.textbox"></button>
+          <button type="button" class="icon-btn" id="btn-textbox" data-icon="textBox" data-i18n-title="tb.textbox"></button>
           <span class="sep"></span>
-          <button class="icon-btn" id="btn-ocr" data-icon="ocr" data-i18n-title="tb.ocr"></button>
+          <button type="button" class="icon-btn" id="btn-ocr" data-icon="ocr" data-i18n-title="tb.ocr"></button>
           <span class="sep"></span>
-          <button class="icon-btn" id="btn-more" data-icon="more" data-i18n-title="tb.more"></button>
+          <button type="button" class="icon-btn" id="btn-more" data-icon="more" data-i18n-title="tb.more"></button>
         </div>
 
         <div class="tb-center">
-          <button class="icon-btn sm" id="btn-zoom-out" data-icon="minus" data-i18n-title="tb.zoomOut"></button>
+          <button type="button" class="icon-btn sm" id="btn-zoom-out" data-icon="minus" data-i18n-title="tb.zoomOut"></button>
           <input
             id="zoom-range"
             class="zoom-range"
@@ -77,30 +77,30 @@
             data-i18n-title="tb.zoomLevel"
             aria-label="Zoom"
           />
-          <button class="icon-btn sm" id="btn-zoom-in" data-icon="plus" data-i18n-title="tb.zoomIn"></button>
-          <button class="icon-btn" id="btn-fit-width" data-icon="fitWidth" data-i18n-title="tb.fitWidth"></button>
+          <button type="button" class="icon-btn sm" id="btn-zoom-in" data-icon="plus" data-i18n-title="tb.zoomIn"></button>
+          <button type="button" class="icon-btn" id="btn-fit-width" data-icon="fitWidth" data-i18n-title="tb.fitWidth"></button>
           <span class="sep"></span>
           <div class="page-box">
             <input id="page-input" class="page-input" value="1" inputmode="numeric" data-i18n-title="tb.page" aria-label="Page" />
             <span class="of" id="page-total">/ 0</span>
           </div>
           <span class="sep"></span>
-          <button class="icon-btn" id="btn-rotate" data-icon="rotate" data-i18n-title="tb.rotate"></button>
+          <button type="button" class="icon-btn" id="btn-rotate" data-icon="rotate" data-i18n-title="tb.rotate"></button>
           <span class="sep"></span>
-          <button class="icon-btn" id="btn-viewmode" data-icon="twoPage" data-i18n-title="tb.twoPage"></button>
+          <button type="button" class="icon-btn" id="btn-viewmode" data-icon="twoPage" data-i18n-title="tb.twoPage"></button>
         </div>
 
         <div class="tb-right">
-          <button class="icon-btn" id="btn-search" data-icon="search" data-i18n-title="tb.search"></button>
+          <button type="button" class="icon-btn" id="btn-search" data-icon="search" data-i18n-title="tb.search"></button>
           <span class="sep"></span>
-          <button class="icon-btn" id="btn-print" data-icon="print" data-i18n-title="tb.print"></button>
-          <button class="icon-btn" id="btn-save" data-icon="save" data-i18n-title="tb.save"></button>
-          <button class="icon-btn" id="btn-saveas" data-icon="saveAs" data-i18n-title="tb.saveAs"></button>
+          <button type="button" class="icon-btn" id="btn-print" data-icon="print" data-i18n-title="tb.print"></button>
+          <button type="button" class="icon-btn" id="btn-save" data-icon="save" data-i18n-title="tb.save"></button>
+          <button type="button" class="icon-btn" id="btn-saveas" data-icon="saveAs" data-i18n-title="tb.saveAs"></button>
           <span class="sep"></span>
-          <button class="icon-btn" id="btn-fullscreen" data-icon="expand" data-i18n-title="tb.fullscreen"></button>
-          <button class="icon-btn" id="btn-settings" data-icon="settings" data-i18n-title="tb.settings"></button>
+          <button type="button" class="icon-btn" id="btn-fullscreen" data-icon="expand" data-i18n-title="tb.fullscreen"></button>
+          <button type="button" class="icon-btn" id="btn-settings" data-icon="settings" data-i18n-title="tb.settings"></button>
           <span class="sep"></span>
-          <button class="text-btn" id="btn-editpdf" data-i18n="tb.editPdf">编辑 PDF</button>
+          <button type="button" class="text-btn" id="btn-editpdf" data-i18n="tb.editPdf">编辑 PDF</button>
         </div>
       </header>
 
@@ -108,20 +108,20 @@
       <div id="editbar" class="editbar hidden">
         <span class="eb-title" id="eb-title" data-i18n="eb.title">编辑</span>
         <span class="sep"></span>
-        <button class="eb-btn" id="eb-select" data-icon="cursor"><span data-i18n="eb.select">选择</span></button>
-        <button class="eb-btn" id="eb-textedit" data-icon="editText"><span data-i18n="eb.textedit">编辑文字</span></button>
-        <button class="eb-btn" id="eb-textbox" data-icon="textBox"><span data-i18n="eb.textbox">添加文本</span></button>
-        <button class="eb-btn" id="eb-image" data-icon="image"><span data-i18n="eb.image">插入图片</span></button>
-        <button class="eb-btn" id="eb-shape" data-icon="shapes"><span data-i18n="eb.shape">形状</span></button>
-        <button class="eb-btn" id="eb-whiteout" data-icon="whiteout"><span data-i18n="eb.whiteout">涂改</span></button>
+        <button type="button" class="eb-btn" id="eb-select" data-icon="cursor"><span data-i18n="eb.select">选择</span></button>
+        <button type="button" class="eb-btn" id="eb-textedit" data-icon="editText"><span data-i18n="eb.textedit">编辑文字</span></button>
+        <button type="button" class="eb-btn" id="eb-textbox" data-icon="textBox"><span data-i18n="eb.textbox">添加文本</span></button>
+        <button type="button" class="eb-btn" id="eb-image" data-icon="image"><span data-i18n="eb.image">插入图片</span></button>
+        <button type="button" class="eb-btn" id="eb-shape" data-icon="shapes"><span data-i18n="eb.shape">形状</span></button>
+        <button type="button" class="eb-btn" id="eb-whiteout" data-icon="whiteout"><span data-i18n="eb.whiteout">涂改</span></button>
         <span class="sep"></span>
-        <button class="eb-btn" id="eb-rotate"><span data-i18n="eb.rotate">旋转页面</span></button>
-        <button class="eb-btn" id="eb-deletepage"><span data-i18n="eb.deletepage">删除页面</span></button>
-        <button class="eb-btn" id="eb-insertpage"><span data-i18n="eb.insertpage">插入空白页</span></button>
+        <button type="button" class="eb-btn" id="eb-rotate"><span data-i18n="eb.rotate">旋转页面</span></button>
+        <button type="button" class="eb-btn" id="eb-deletepage"><span data-i18n="eb.deletepage">删除页面</span></button>
+        <button type="button" class="eb-btn" id="eb-insertpage"><span data-i18n="eb.insertpage">插入空白页</span></button>
         <span class="sep"></span>
         <div class="eb-prop" id="eb-props"></div>
         <span class="flex"></span>
-        <button class="eb-btn primary" id="eb-done" data-i18n="eb.done">完成</button>
+        <button type="button" class="eb-btn primary" id="eb-done" data-i18n="eb.done">完成</button>
       </div>
 
       <!-- ============================== 主区域 ============================== -->
@@ -129,7 +129,7 @@
         <aside id="sidebar" class="sidebar hidden">
           <div class="sidebar-head">
             <span class="sb-title" data-i18n="sb.title">目录</span>
-            <button class="icon-btn sm" id="sidebar-close" data-icon="close" data-i18n-title="sb.close"></button>
+            <button type="button" class="icon-btn sm" id="sidebar-close" data-icon="close" data-i18n-title="sb.close"></button>
           </div>
           <div class="sb-body">
             <div id="outline" class="outline hidden"></div>
@@ -145,20 +145,20 @@
           <span class="s-ico" data-icon="search"></span>
           <input id="search-input" data-i18n-ph="search.placeholder" placeholder="在文档中搜索" spellcheck="false" />
           <span class="s-count" id="search-count">0/0</span>
-          <button class="icon-btn sm" id="search-prev" data-icon="chevronUp" data-i18n-title="search.prev"></button>
-          <button class="icon-btn sm" id="search-next" data-icon="chevronDown" data-i18n-title="search.next"></button>
-          <button class="icon-btn sm" id="search-close" data-icon="close" data-i18n-title="search.close"></button>
+          <button type="button" class="icon-btn sm" id="search-prev" data-icon="chevronUp" data-i18n-title="search.prev"></button>
+          <button type="button" class="icon-btn sm" id="search-next" data-icon="chevronDown" data-i18n-title="search.next"></button>
+          <button type="button" class="icon-btn sm" id="search-close" data-icon="close" data-i18n-title="search.close"></button>
         </div>
 
         <!-- OCR 文字识别面板 -->
         <aside id="ocrPanel" class="ocr-panel hidden">
           <div class="op-head">
             <span class="op-title"><span data-icon="ocr"></span><span data-i18n="ocr.title">文字识别</span></span>
-            <button class="icon-btn sm" id="ocr-close" data-icon="close" data-i18n-title="modal.close"></button>
+            <button type="button" class="icon-btn sm" id="ocr-close" data-icon="close" data-i18n-title="modal.close"></button>
           </div>
           <div class="op-tools">
-            <button class="op-btn primary" id="ocr-run-page" data-i18n="ocr.runPage">识别当前页</button>
-            <button class="op-btn" id="ocr-run-region" data-i18n="ocr.runRegion">框选区域</button>
+            <button type="button" class="op-btn primary" id="ocr-run-page" data-i18n="ocr.runPage">识别当前页</button>
+            <button type="button" class="op-btn" id="ocr-run-region" data-i18n="ocr.runRegion">框选区域</button>
           </div>
           <div class="op-lang">
             <span data-i18n="ocr.lang">识别语言</span>
@@ -171,8 +171,8 @@
           <div class="op-status" id="ocr-status" data-i18n="ocr.hint">把扫描页或图片中的文字识别为可复制的文本</div>
           <div class="op-list" id="ocr-list"></div>
           <div class="op-foot">
-            <button class="op-btn" id="ocr-copy-all" data-i18n="ocr.copyAll">复制全部</button>
-            <button class="op-btn" id="ocr-insert" data-i18n="ocr.insert">插入文本框</button>
+            <button type="button" class="op-btn" id="ocr-copy-all" data-i18n="ocr.copyAll">复制全部</button>
+            <button type="button" class="op-btn" id="ocr-insert" data-i18n="ocr.insert">插入文本框</button>
             <label class="op-check"
               ><input type="checkbox" id="ocr-show-boxes" checked /> <span data-i18n="ocr.showBoxes">显示识别框</span></label
             >
@@ -185,7 +185,7 @@
             <img class="empty-icon" src="assets/pdf-icon-256.png" alt="PDF" />
             <h1 data-i18n="empty.title">打开 PDF 文件</h1>
             <p data-i18n="empty.desc">将文件拖放到此处，或点击下方按钮选择文件</p>
-            <button class="btn-primary" id="empty-open" data-i18n="empty.open">打开文件</button>
+            <button type="button" class="btn-primary" id="empty-open" data-i18n="empty.open">打开文件</button>
           </div>
         </div>
 
@@ -213,7 +213,7 @@
         <div class="modal-card">
           <div class="modal-head">
             <h2 id="modal-title">提示</h2>
-            <button class="icon-btn sm" id="modal-close" data-icon="close" data-i18n-aria="modal.close"></button>
+            <button type="button" class="icon-btn sm" id="modal-close" data-icon="close" data-i18n-aria="modal.close"></button>
           </div>
           <div class="modal-body" id="modal-body"></div>
           <div class="modal-foot" id="modal-foot"></div>

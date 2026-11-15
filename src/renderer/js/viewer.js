@@ -322,7 +322,7 @@
     runZoomHooks();
     state.zoom = clampZoom(z);
     if (mode) state.zoomMode = mode;
-    markZooming();
+    markInteracting();
     const anchor = captureAnchor();
     layout();
     restoreAnchor(anchor);
@@ -955,7 +955,7 @@
       const want = zoom * dpr;
       const fullScale = p.wPt * p.hPt * want * want > MAX_BITMAP_PX ? Math.sqrt(MAX_BITMAP_PX / (p.wPt * p.hPt)) : want;
       // 滚动中按 1:1 CSS 像素画（快得多），停手后再补到 fullScale
-      const scale = st._scrolling ? Math.min(fullScale, zoom * QUICK_SCALE) : fullScale;
+      const scale = st._interacting ? Math.min(fullScale, zoom * QUICK_SCALE) : fullScale;
       const isFull = scale >= fullScale - 0.001;
       const viewport = page.getViewport({ scale, rotation: p.rot });
       const canvas = p.canvas;
@@ -1002,7 +1002,7 @@
       } else if (p._upgrade) {
         // 低清那次刚画完，现在补高清（这期间又开始滚动的话就放弃，等下次停手）
         p._upgrade = false;
-        if (!st._scrolling && p._q !== 'full') {
+        if (!st._interacting && p._q !== 'full') {
           p._lastZoom = -1;
           renderPage(pageId);
         }
@@ -1180,7 +1180,7 @@
         }
       }
       updatePageIndicator();
-      markScrolling();
+      markInteracting();
       renderVisible(false);
       // 页码浮标只在真的换页时重启动画，避免每帧 clearTimeout/setTimeout
       if (S().currentPage !== before) showFloatPage();
@@ -1189,31 +1189,23 @@
   let scrollRaf = 0;
 
   /**
-   * 滚动期间用低分辨率快画，停手 160ms 后再补高清。
+   * 标记「用户正在操作视图」（滚动、缩放都算），停手 160ms 后补高清。
    *
-   * 一页 4.2MP 的光栅化要占住主线程上百毫秒，连续滚动时每页都卡一下；
-   * 滚动中按 1:1 CSS 像素画（约 2MP）足够看清「翻到哪了」，停下来再补细节。
+   * 一页 4.2MP 的光栅化要占住主线程上百毫秒，连续操作时每页都卡一下；
+   * 操作中按 1:1 CSS 像素画（约 2MP）足够看清「翻到哪了」，停下来再补细节。
    */
-  function markScrolling() {
+  function markInteracting() {
     const st = S();
-    st._scrolling = true;
+    st._interacting = true;
     clearTimeout(st._idleT);
     st._idleT = setTimeout(() => {
       // 期间切了标签页：这次补画属于旧标签页，丢掉
       if (S() !== st) return;
-      st._scrolling = false;
+      st._interacting = false;
       upgradeVisible();
     }, 160);
   }
 
-  /**
-   * 缩放也算「交互中」：连点 +/- 或捏合时，每次都按 1:1 CSS 像素先画，
-   * 停手 160ms 后再补高清。否则每次落位都要重画 2–3 页 4.2MP 的位图 + 文本层，
-   * 点几下就卡成幻灯片。
-   */
-  function markZooming() {
-    markScrolling();
-  }
 
   /** 停手后把可见页从「低清」补成「高清」（顺带补文本层） */
   function upgradeVisible() {
@@ -1296,19 +1288,24 @@
     if (!animate) renderVisible(false);
   }
 
+  /** 视点锚点的纵向留白：页面顶边相对视口顶部的参考偏移 */
+  const ANCHOR_PAD = 8;
+
   function captureAnchor() {
     const p = S().pages[S().currentPage];
     if (!p || !p.el) return null;
     const area = el.scroll.getBoundingClientRect();
     const r = p.el.getBoundingClientRect();
-    return { index: S().currentPage, ratio: (area.top - r.top) / Math.max(1, r.height) };
+    // 这里把 ANCHOR_PAD 一起算进比例，与 restoreAnchor 里的 -ANCHOR_PAD 对称。
+    // 两端不对称时，每点一次「适应宽度 / 适应页面」页面就会往上漂 8px。
+    return { index: S().currentPage, ratio: (area.top - r.top + ANCHOR_PAD) / Math.max(1, r.height) };
   }
 
   function restoreAnchor(anchor) {
     if (!anchor) return;
     const p = S().pages[anchor.index];
     if (!p || !p.el) return;
-    el.scroll.scrollTop = p.el.offsetTop - 8 + anchor.ratio * p.el.offsetHeight;
+    el.scroll.scrollTop = p.el.offsetTop - ANCHOR_PAD + anchor.ratio * p.el.offsetHeight;
   }
 
   /**
@@ -1544,7 +1541,7 @@
           if (!wrap) continue;
           const p = S().pages.find((x) => x.id === wrap.dataset.id);
           const c = entry.target.querySelector('canvas');
-          if (p && c) renderThumb(p, c);
+          if (p && c) queueThumb(p, c);
         }
       },
       { root, rootMargin: '600px 0px' }
@@ -1596,6 +1593,19 @@
         c.fillRect(0, 0, canvas.width, canvas.height);
         return;
       }
+      // 有低清快照：一次 drawImage 搞定，省掉一整次 pdf.js 渲染
+      const snap = snaps.get(p.id);
+      if (snap) {
+        const w = Math.max(1, Math.round(p.wPt * scale));
+        const h = Math.max(1, Math.round(p.hPt * scale));
+        canvas.width = w;
+        canvas.height = h;
+        const c = canvas.getContext('2d', { alpha: false });
+        c.fillStyle = '#ffffff';
+        c.fillRect(0, 0, w, h);
+        c.drawImage(snap.canvas, 0, 0, w, h);
+        return;
+      }
       // 主画布已画好：直接缩放过来，既快又不会和主渲染抢同一页
       if (p.rendered && p.canvas && p.canvas.width > 1) {
         const w = Math.max(1, Math.round(p.wPt * scale));
@@ -1624,10 +1634,32 @@
     }
   }
 
+  /* 缩略图渲染串行化：一次只画一张并让出主线程，避免十几张缩略图和正文抢同一个线程 */
+  const thumbQueue = [];
+  let thumbBusy = false;
+
+  function queueThumb(p, canvas) {
+    thumbQueue.push({ p, canvas });
+    pumpThumbQueue();
+  }
+
+  function pumpThumbQueue() {
+    if (thumbBusy) return;
+    const job = thumbQueue.shift();
+    if (!job) return;
+    thumbBusy = true;
+    setTimeout(() => {
+      Promise.resolve(renderThumb(job.p, job.canvas)).finally(() => {
+        thumbBusy = false;
+        pumpThumbQueue();
+      });
+    }, 24);
+  }
+
   function renderThumbIfOpen(p) {
     if (!isSidebarOpen()) return;
     const wrap = el.thumbs.querySelector(`.thumb[data-id="${p.id}"]`);
-    if (wrap) renderThumb(p, wrap.querySelector('canvas'));
+    if (wrap) queueThumb(p, wrap.querySelector('canvas'));
   }
 
   function renderThumbsIfOpen() {

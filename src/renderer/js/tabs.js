@@ -276,6 +276,7 @@
       title.textContent = label(t);
 
       const btn = document.createElement('button');
+      btn.type = 'button';
       btn.className = 'tab-close';
       btn.title = tr('tab.close');
       btn.innerHTML = Icons.svg('close');
