@@ -1,33 +1,33 @@
 ---
-name: 🐛 Bug 报告
-about: 界面显示异常、功能不工作、崩溃等
+name: 🐛 Bug report
+about: Something renders wrong, a feature does not work, or the app crashes
 title: '[Bug] '
 labels: bug
 ---
 
-## 现象
+## What happens
 
-<!-- 发生了什么？期望是什么？ -->
+<!-- What did you see? What did you expect? -->
 
-## 复现步骤
+## Steps to reproduce
 
 1.
 2.
 3.
 
-## 环境
+## Environment
 
-| 项 | 值 |
+| Item | Value |
 | --- | --- |
-| 应用版本 | <!-- 设置 → 关于，或安装包文件名 --> |
-| Windows 版本 | <!-- winver 里的版本号 --> |
-| 安装方式 | 安装包 / 源码运行 |
-| 是否深色主题 | 是 / 否 |
+| App version | <!-- Settings → About, or the installer file name --> |
+| Windows version | <!-- the version shown by winver --> |
+| Installed how | Installer / running from source |
+| Dark theme? | Yes / No |
 
-## 附件
+## Attachments
 
-<!-- 截图或录屏；如果是特定 PDF 的问题，请尽量提供最小复现文件（注意脱敏） -->
+<!-- Screenshots or a screen recording. For a PDF-specific problem, a minimal file helps (redact as needed) -->
 
-## 补充信息
+## Anything else
 
-<!-- 控制台报错、导出后的 PDF 表现等 -->
+<!-- Console errors, what the exported PDF looks like, etc. -->

@@ -6,8 +6,6 @@
 
 **Clean UI · Serious features**
 
-[English](README.md) · [简体中文](README.zh-CN.md)
-
 A lightweight, fast PDF reader with **tabs**, annotation, in-place text editing, page management and
 fully offline OCR — all inside a single, uncluttered window.
 
@@ -36,7 +34,7 @@ features missing. No ads, no account, no network — it works offline, and even 
 
 | 🫧 Clean UI | 🧰 Serious features |
 | --- | --- |
-| One 48px toolbar row, no nested menu maze | Highlight / pen / eraser / text box / shapes / images / whiteout — all written back into the PDF |
+| One 48px toolbar row, no nested menu maze — it **scrolls sideways** on narrow windows instead of hiding buttons behind a "more" menu | Highlight / pen / eraser / text box / shapes / images / whiteout — all written back into the PDF |
 | No start screen, no ads, no recommendations, no "upgrade to Pro" | Click the original text to **edit it in place** (no dialog), with automatic font subsetting |
 | No account, no cloud sync, no network requests at all | Rotate / delete / insert pages, with the PDF genuinely rebuilt on save |
 | Dark and light themes stay restrained and never fight the content | Home-grown **offline OCR**, automatic Chinese/English switching, scanned pages become selectable text |
@@ -44,6 +42,7 @@ features missing. No ads, no account, no network — it works offline, and even 
 | One-click Chinese/English UI (Microsoft YaHei UI for Chinese, Segoe UI for English) | **Two-page view**, smooth Ctrl+wheel zoom, zoom slider |
 | The tab strip is only 38px tall | **Browser-style tabs**: drag to reorder, tear out into a separate window, independent state |
 | Sidebar appears on demand and takes no space otherwise | **Contents sidebar**: PDF bookmarks + page thumbnails, current page outlined |
+| A 553-page book scrolls, jumps and zooms like a 5-page one | Renders at full screen resolution, not at a "fast enough" compromise |
 
 ## Screenshots
 
@@ -96,6 +95,8 @@ features missing. No ads, no account, no network — it works offline, and even 
 - Full-text search: highlighted hits, orange marker on the current hit, previous/next, match counter
 - Printing, document properties
 - Open by drag & drop, by double-clicking a `.pdf`, single instance with multiple files
+- **Toolbar that adapts**: on narrow windows the row scrolls sideways — chevron buttons at both ends, or a
+  plain wheel / trackpad swipe — instead of hiding features behind a "more" menu
 - Light / dark / follow-system themes
 
 ### Annotation (written into the PDF file)
@@ -220,6 +221,32 @@ full interaction flow.
 3. Leave the language on "Auto", or pick "Chinese + English" / "English only";
 4. When it finishes you can copy everything, click a line to jump to it, or "Insert as text box" to write
    the results into the PDF.
+
+## Performance
+
+Measured on a 553-page vocabulary book (476×648 pt pages, 2.55× zoom, 2× display):
+
+| Metric | Result |
+| --- | --- |
+| Page bitmaps alive at any moment | **2–3** (not 553) — a canvas is created when a page approaches the viewport and dropped when it leaves |
+| Scroll bookkeeping per frame | **0.1–1.2 ms** (was 3.5–10 ms) — page offsets are cached at layout time, the visible range comes from a binary search |
+| Text layer build | **0.7 ms** per page (was 198–273 ms) — all span widths are read first, then all transforms are written, so the browser lays out once instead of once per span |
+| Rasterisations per zoom | **1**, debounced 120 ms after the last change (was 2 per click, so 10 for five clicks) |
+| Bitmap resolution | full device pixels — 2428×3303 at 2.55× on a 2× screen, i.e. effective dpr 2.00 |
+| Outline jump to visible content | **19–76 ms** |
+
+Three design decisions carry most of this:
+
+1. **Nothing is allocated up front.** A 553-page document used to create 1106 canvases; their default
+   300×150 backing store alone is ~200 MB, which exhausts the renderer's canvas budget — once that
+   happens drawing into a canvas silently does nothing and the page stays at its cleared (opaque black)
+   state. Canvases now exist only near the viewport.
+2. **Scrolling never touches the whole document.** Page offsets are cached when the layout settles and
+   the visible range is found by binary search, so per-frame cost depends on the screen, not the page
+   count.
+3. **Zoom is not a scroll.** Zooming is a GPU transform of the existing page bitmaps (text and annotation
+   layers are hidden while it plays), and the real re-render starts 120 ms after the last change, at full
+   resolution, cancelling any render that has become stale.
 
 ## How it works
 

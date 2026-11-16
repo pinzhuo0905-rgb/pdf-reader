@@ -3,6 +3,7 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const st = App.state;
   for (let i = 0; i < 80 && !st.pdfDoc; i++) await sleep(150);
+  App.i18n.setLang('en', { silent: true });
   await sleep(700);
 
   // 用示例 PDF 同目录下的第二个文档，保证脚本可移植

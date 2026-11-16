@@ -1,42 +1,45 @@
-# 第三方组件与资源声明
+# Third-party components and assets
 
-本项目自身代码以 [MIT](LICENSE) 分发。以下是随仓库或随安装包一起分发的第三方内容及其许可。
+This project's own code is distributed under the [MIT](LICENSE) license. Below is the third-party
+material shipped with the repository or the installer, and its license.
 
-## 运行时依赖
+## Runtime dependencies
 
-| 组件 | 版本 | 许可 | 用途 |
+| Component | Version | License | Purpose |
 | --- | --- | --- | --- |
-| [Electron](https://www.electronjs.org/) | 33.x | MIT | 桌面运行时 |
-| [PDF.js](https://mozilla.github.io/pdf.js/) (`pdfjs-dist`) | 3.11.174 | Apache-2.0 | PDF 解析与页面渲染 |
-| [pdf-lib](https://pdf-lib.js.org/) | 1.17.1 | MIT | 标注与页面操作写回 PDF |
-| [@pdf-lib/fontkit](https://github.com/Hopding/fontkit) | 1.1.1 | MIT | 自定义 TTF 字体嵌入（中文改字） |
-| [onnxruntime-node](https://github.com/microsoft/onnxruntime) | 1.20.x | MIT | 通用 ONNX 推理运行时（OCR 用） |
+| [Electron](https://www.electronjs.org/) | 33.x | MIT | Desktop runtime |
+| [PDF.js](https://mozilla.github.io/pdf.js/) (`pdfjs-dist`) | 3.11.174 | Apache-2.0 | PDF parsing and page rendering |
+| [pdf-lib](https://pdf-lib.js.org/) | 1.17.1 | MIT | Writing annotations and page operations back into the PDF |
+| [@pdf-lib/fontkit](https://github.com/Hopding/fontkit) | 1.1.1 | MIT | Embedding custom TTF fonts (editing Chinese text) |
+| [onnxruntime-node](https://github.com/microsoft/onnxruntime) | 1.20.x | MIT | Generic ONNX inference runtime (used by OCR) |
 
-## OCR 模型与算法参考
+## OCR models and algorithmic references
 
-| 内容 | 来源 | 许可 |
+| Item | Source | License |
 | --- | --- | --- |
-| `assets/models/det.onnx` | PP-OCRv4 检测模型（PaddleOCR，经 [RapidOCR](https://github.com/RapidAI/RapidOCR) 转为 ONNX） | Apache-2.0 |
-| `assets/models/rec.onnx` + `ppocr_keys_v1.txt` | PP-OCRv4 中文识别模型（6623 字字典） | Apache-2.0 |
-| `assets/models/rec_en.onnx` + `en_dict.txt` | PP-OCRv4 英文识别模型（95 字符字典） | Apache-2.0 |
-| DB / CTC 后处理算法 | 参考 PaddleOCR、RapidOCR 的 Python 实现，**本项目用 JavaScript 重写**（`src/main/ocr/`） | Apache-2.0 |
+| `assets/models/det.onnx` | PP-OCRv4 detection model (PaddleOCR, converted to ONNX by [RapidOCR](https://github.com/RapidAI/RapidOCR)) | Apache-2.0 |
+| `assets/models/rec.onnx` + `ppocr_keys_v1.txt` | PP-OCRv4 Chinese recognition model (6,623-character dictionary) | Apache-2.0 |
+| `assets/models/rec_en.onnx` + `en_dict.txt` | PP-OCRv4 English recognition model (95-character dictionary) | Apache-2.0 |
+| DB / CTC post-processing | Follows the PaddleOCR and RapidOCR Python implementations; **re-written in JavaScript in this repository** (`src/main/ocr/`) | Apache-2.0 |
 
-> 算法论文：*Real-time Scene Text Detection with Differentiable Binarization* (AAAI 2020)、
-> *SVTR: Scene Text Recognition with a Single Visual Model* (IJCAI 2022)。
+> Papers: *Real-time Scene Text Detection with Differentiable Binarization* (AAAI 2020) and
+> *SVTR: Scene Text Recognition with a Single Visual Model* (IJCAI 2022).
 
-## 图形资源
+## Graphics
 
-| 资源 | 说明 |
+| Asset | Notes |
 | --- | --- |
-| `src/renderer/js/icons.js` | 全部工具栏图标为本仓库手写 SVG（MIT） |
-| `build/icon.ico`、`assets/pdf-icon.ico`、`assets/pdf-icon-256.png` | **复刻 Microsoft Edge 作为默认 PDF 查看器时使用的 PDF 文档图标**，由 `scripts/extract-edge-icon.mjs` 从 `msedge.exe` 的图标组 `#11 (IDR_X007_PDF_DOC)` 提取 |
+| `src/renderer/js/icons.js` | Every toolbar icon is hand-written SVG in this repository (MIT) |
+| `build/icon.ico`, `assets/pdf-icon.ico`, `assets/pdf-icon-256.png` | The PDF document icon that **Microsoft Edge uses when it is the default PDF viewer**, extracted by `scripts/extract-edge-icon.mjs` from the icon group `#11 (IDR_X007_PDF_DOC)` inside `msedge.exe` |
 
-⚠️ **关于图标**：上述图标的原始美术资源版权归 Microsoft 所有。本仓库为满足「界面与图标与 Edge 一致」的
-产品需求而附带该文件，**不属于 MIT 许可范围**。若你计划公开发布、商用或再分发，请自行评估合规性，
-或按 README「替换应用图标」一节换成你自己的图标。
+> **About the icon**: the artwork is copyright Microsoft. The file is included here because the product
+> requirement was to match the icon shown by the reference viewer; it is **not covered by the MIT
+> license**. If you plan to publish, sell or redistribute this project, evaluate that yourself, or follow
+> the "Replacing the application icon" section of the README and use your own artwork.
 
-## 字体
+## Fonts
 
-- 界面字体使用系统自带的 Segoe UI / Microsoft YaHei，不随包分发；
-- 「改字」功能在保存时会从系统字体目录（如 `C:\Windows\Fonts\simhei.ttf`）读取一个中文字体并**做子集嵌入**，
-  只嵌入用到的字形，字体文件本身不随本项目分发。
+- The UI uses the system fonts Segoe UI and Microsoft YaHei; neither is bundled.
+- The text-editing feature reads one Chinese font from the system font directory (for example
+  `C:\Windows\Fonts\simhei.ttf`) at save time and **embeds a subset** containing only the glyphs that are
+  actually used. The font file itself is never redistributed with this project.

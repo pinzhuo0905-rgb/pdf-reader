@@ -1,24 +1,24 @@
 ---
-name: ✨ 功能建议
-about: 想要的新能力或体验改进
+name: ✨ Feature request
+about: A capability you want, or an experience you want improved
 title: '[Feature] '
 labels: enhancement
 ---
 
-## 想解决的问题
+## The problem
 
-<!-- 你在什么场景下觉得不顺手？ -->
+<!-- In what situation does the app feel awkward today? -->
 
-## 期望的方案
+## What you would like
 
-<!-- 你希望它怎么工作？如果有其他软件的实现可以参考，请描述 -->
+<!-- How should it behave? If another app does it well, describe that -->
 
-## 是否愿意提交 PR
+## Would you send a PR?
 
-- [ ] 我可以自己实现并提 PR
-- [ ] 我需要指导
-- [ ] 只是提个想法
+- [ ] I can implement it myself
+- [ ] I would need guidance
+- [ ] Just an idea
 
-## 备注
+## Notes
 
-<!-- 是否与「界面纯净」的定位冲突？如果会新增工具栏按钮，请说明为什么必须放在一级界面 -->
+<!-- Does it conflict with the "clean UI" goal? If it adds a toolbar button, explain why it must live on the first level -->
